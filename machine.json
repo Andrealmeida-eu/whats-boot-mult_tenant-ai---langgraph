@@ -1,0 +1,697 @@
+{
+  "sistema": "BN01004 - COBERTURA (AV500+ELEV.+TRANSP.) \n\n00_COBERTURA_BN01004\n\n",
+  "atuadores": [
+    {
+      "nome": "KM525/KM526 - Contatores gerais alimentação potência (barramentos 2L e 1L)",
+      "potencia": {
+        "sequencia": [
+          "440VAC:L1/L2/L3 -> QS10(1-2/3-4/5-6) -> KM525(1-2/3-4/5-6) -> Barramento_2L1/2L2/2L3",
+          "440VAC:L1/L2/L3 -> QS10(1-2/3-4/5-6) -> KM526(1-2/3-4/5-6) -> Barramento_1L1/1L2/1L3"
+        ],
+        "protecao": [
+          "QS10",
+          "KM525",
+          "KM526"
+        ]
+      },
+      "comando": {
+        "fonte": "24VDC:24V2/O24 -> AP524(A1/A2)",
+        "permissivos": [
+          "SAFETY: AP503(G953-201)=OK -> 24V2 presente | CHECK: LED/status no AP503 e medição 24V2 em bornes",
+          "SAFETY: SQ520(fim de curso segurança portas)=fechado | CHECK: status do sensor SQ520 e continuidade em XT520(5241/5242/5244)",
+          "SAFETY: AP564(multing saida)=OK -> KA565(11-12) e KA566(41-42) fechados | CHECK: LEDs no AP564 e estado dos relés KA565/KA566",
+          "SAFETY: SB528(reset segurança acesso máquina)=acionado | CHECK: atuação do SB528 e diagnóstico do AP524",
+          "HARDWIRED: 24V1 presente (alimentação do circuito de segurança) | CHECK: medir tensão no barramento 24V1",
+          "HARDWIRED: QS10=ON | CHECK: posição do seccionador QS10 e presença de tensão a montante de KM525/KM526"
+        ],
+        "elemento_acionamento": "24VDC:24V2/O24 -> AP524(13-14) -> 5052 -> KM525(A1) + KM526(A1) ; retorno -> O24 -> KM525(A2)/KM526(A2)",
+        "realimentacao": [
+          "PLC_IN: AP151(I-19)=1 (SEGURANÇA ACESSO MÁQUINA) | CHECK: diagnóstico da entrada I-19 no PLC",
+          "HARDWIRED: KM525(21-22) e KM526(21-22) (realimentação/monitoramento do AP524) | CHECK: continuidade e coerência com estado das bobinas"
+        ]
+      }
+    },
+    {
+      "nome": "YV529 - Eletroválvula descarga de ar máquina",
+      "potencia": {
+        "sequencia": [
+          "24VDC:24V3/O24 -> 36F1(1A) -> X1 -> XT360(8) -> MURR36.1(8) -> YV529(A1) ; retorno -> O24 -> YV529(A2)"
+        ],
+        "protecao": [
+          "36F1",
+          "X1"
+        ]
+      },
+      "comando": {
+        "fonte": "24VDC:24V3/O24",
+        "permissivos": [
+          "SAFETY: ASSUMIDO: 24V3 é removido quando AP524 desarma (fail-safe) | CHECK: medir 24V3 em X1/XT360(8) com portas abertas/fechadas",
+          "HARDWIRED: 36F1(1A)=OK | CHECK: continuidade do fusível e tensão pós-fusível em XT360(8)"
+        ],
+        "elemento_acionamento": "24VDC:24V3/O24 -> 36F1(1A) -> X1 -> XT360(8) -> MURR36.1(8) -> YV529(A1) ; retorno -> O24 -> YV529(A2)",
+        "realimentacao": [
+          "NÃO INDICADO NO DIAGRAMA"
+        ]
+      }
+    },
+    {
+      "nome": "M63 - Motor rotação braço (inversor UF63 + freio YB63)",
+      "potencia": {
+        "sequencia": [
+          "440VAC:L1/L2/L3 -> QS10(1-2/3-4/5-6) -> KM526(1-2/3-4/5-6) -> Barramento_1L1/1L2/1L3 -> QM61(1-2/3-4/5-6) -> UF63(L1/L2/L3) -> UF63(U/V/W) -> TM63(1-U631/2-V632/3-W633/PE) -> M63(U/V/W/PE)",
+          "440VAC:ASSUMIDO:2Fases_do_barramento_1L -> QM61(derivação) -> KM312(1-2/3-4) -> YB63(1/2/3) -> Freio_M63"
+        ],
+        "protecao": [
+          "QM61",
+          "UF63",
+          "RR641",
+          "KM312"
+        ]
+      },
+      "comando": {
+        "fonte": "24VDC:24V/O24 (saídas PLC)",
+        "permissivos": [
+          "SAFETY: AP524 -> KM526 energizado -> Barramento_1L presente | CHECK: estado KM526 e medição 440VAC em QM61(1/3/5)",
+          "HARDWIRED: QM61(ajuste 6.5A)=ligado | CHECK: posição do disjuntor-motor QM61 e tensão em UF63(L1/L2/L3)",
+          "PLC_OUT: AP151(O-01)=1 (FREIO MOTOR ROTAÇÃO BRAÇO) | CHECK: LED do canal O-01 e tensão em KM312(A1)",
+          "UNKNOWN: ASSUMIDO: comando START/RUN e referência de velocidade via Ethernet ETH1 no UF63 | CHECK: status de comunicação/Run no inversor UF63 e no PLC"
+        ],
+        "elemento_acionamento": "24VDC:+24/O24 -> AP151(O-01) -> KM312(A1) ; retorno -> O24 -> KM312(A2) || ASSUMIDO:ETHERNET -> AP134 -> UF63(ETH1)",
+        "realimentacao": [
+          "PLC_IN: AP151(I-04)=1 (BRAÇO ROTANTE POSIÇÃO DE REPOUSO) | CHECK: diagnóstico entrada I-04 e atuação do sensor associado",
+          "PLC_IN: AP151(I-05)=1 (DESACELERAÇÃO BRAÇO ROTANTE) | CHECK: diagnóstico entrada I-05 e sensores SQ215/SQ216",
+          "PLC_IN: AP151(I-11)=1 (SEGURANÇA EXTERNA ROTAÇÃO BRAÇO ENTRADA) | CHECK: diagnóstico entrada I-11",
+          "PLC_IN: AP151(I-12)=1 (SEGURANÇA INTERNA ROTAÇÃO BRAÇO ENTRADA) | CHECK: diagnóstico entrada I-12",
+          "PLC_IN: AP151(I-20)=1 (SEGURANÇA EXTERNA ROTAÇÃO BRAÇO SAÍDA) | CHECK: diagnóstico entrada I-20",
+          "PLC_IN: AP151(I-21)=1 (SEGURANÇA INTERNA ROTAÇÃO BRAÇO SAÍDA) | CHECK: diagnóstico entrada I-21",
+          "UNKNOWN: Feedback RUN/FAULT do UF63 - NÃO INDICADO NO DIAGRAMA (provável via Ethernet)"
+        ]
+      }
+    },
+    {
+      "nome": "M73 - Motor sobe/desce bobina filme (inversor UF73 + freio YB73)",
+      "potencia": {
+        "sequencia": [
+          "440VAC:L1/L2/L3 -> QS10(1-2/3-4/5-6) -> KM526(1-2/3-4/5-6) -> Barramento_1L1/1L2/1L3 -> QM71(1-2/3-4/5-6) -> UF73(L1/L2/L3) -> UF73(U/V/W) -> TM73(1-U731/2-V732/3-W733/PE) -> M73(U/V/W/PE)",
+          "440VAC:ASSUMIDO:2Fases_do_barramento_1L -> QM71(derivação) -> KM313(1-2/3-4) -> YB73(1/2/3) -> Freio_M73"
+        ],
+        "protecao": [
+          "QM71",
+          "UF73",
+          "KM313"
+        ]
+      },
+      "comando": {
+        "fonte": "24VDC:24V/O24 (saídas PLC)",
+        "permissivos": [
+          "SAFETY: AP524 -> KM526 energizado -> Barramento_1L presente | CHECK: estado KM526 e medição 440VAC em QM71(1/3/5)",
+          "HARDWIRED: QM71(ajuste 4.5A)=ligado | CHECK: posição do disjuntor-motor QM71 e tensão em UF73(L1/L2/L3)",
+          "PLC_OUT: AP151(O-02)=1 (FREIO MOTOR BOBINA FILME) | CHECK: LED do canal O-02 e tensão em KM313(A1)",
+          "UNKNOWN: ASSUMIDO: comando START/RUN e referência de velocidade via Ethernet ETH2 no UF73 | CHECK: status de comunicação/Run no inversor UF73 e no PLC"
+        ],
+        "elemento_acionamento": "24VDC:+24/O24 -> AP151(O-02) -> KM313(A1) ; retorno -> O24 -> KM313(A2) || ASSUMIDO:ETHERNET -> AP134 -> UF73(ETH2)",
+        "realimentacao": [
+          "PLC_IN: AP151(I-09)=1 (ALARME EXTRA CURSO BOBINA) | CHECK: diagnóstico entrada I-09 e sensor associado",
+          "UNKNOWN: Feedback RUN/FAULT do UF73 - NÃO INDICADO NO DIAGRAMA (provável via Ethernet)"
+        ]
+      }
+    },
+    {
+      "nome": "M83 - Motor pré-estirado envelopadora (inversor UF83)",
+      "potencia": {
+        "sequencia": [
+          "440VAC:L1/L2/L3 -> QS10(1-2/3-4/5-6) -> KM526(1-2/3-4/5-6) -> Barramento_1L1/1L2/1L3 -> QM83(1-2/3-4/5-6) -> UF83(L1/L2/L3) -> UF83(U/V/W) -> TM83(1-U831/2-V832/3-W833/PE) -> M83(U/V/W/PE)"
+        ],
+        "protecao": [
+          "QM83",
+          "UF83"
+        ]
+      },
+      "comando": {
+        "fonte": "ASSUMIDO:Ethernet + 24VDC de controle do inversor",
+        "permissivos": [
+          "SAFETY: AP524 -> KM526 energizado -> Barramento_1L presente | CHECK: estado KM526 e medição 440VAC em QM83(1/3/5)",
+          "HARDWIRED: QM83(ajuste 4.5A)=ligado | CHECK: posição do disjuntor-motor QM83 e tensão em UF83(L1/L2/L3)",
+          "UNKNOWN: ASSUMIDO: comando START/RUN e referência de velocidade via Ethernet ETH3 no UF83 | CHECK: status de comunicação/Run no inversor UF83 e no PLC"
+        ],
+        "elemento_acionamento": "ASSUMIDO:ETHERNET -> AP134 -> UF83(ETH3)",
+        "realimentacao": [
+          "PLC_IN: AP151(I-03)=1 (FILME ROMPIDO) | CHECK: diagnóstico entrada I-03 e sensor BF213",
+          "UNKNOWN: Feedback RUN/FAULT do UF83 - NÃO INDICADO NO DIAGRAMA (provável via Ethernet)"
+        ]
+      }
+    },
+    {
+      "nome": "M87 - Motor elevador hidráulico (contator KM381)",
+      "potencia": {
+        "sequencia": [
+          "440VAC:L1/L2/L3 -> QS10(1-2/3-4/5-6) -> KM526(1-2/3-4/5-6) -> Barramento_1L1/1L2/1L3 -> QM87(1-2/3-4/5-6) -> KM381(1-2/3-4/5-6) -> TM87(1-U871/2-V872/3-W873/PE) -> M87(U/V/W/PE)"
+        ],
+        "protecao": [
+          "QM87",
+          "KM381"
+        ]
+      },
+      "comando": {
+        "fonte": "24VDC:24V/O24 (saídas PLC)",
+        "permissivos": [
+          "SAFETY: AP524 -> KM526 energizado -> Barramento_1L presente | CHECK: estado KM526 e medição 440VAC em QM87(1/3/5)",
+          "HARDWIRED: QM87(ajuste 6.3A)=ligado | CHECK: posição do disjuntor-motor QM87 e tensão em KM381(1/3/5)",
+          "PLC_OUT: AP157(O-08)=1 (SOBE ELEVADOR) | CHECK: LED do canal O-08 no módulo AP157 e tensão em KM381(A1)"
+        ],
+        "elemento_acionamento": "24VDC:+24/O24 -> AP157(O-08) -> KM381(A1) ; retorno -> O24 -> KM381(A2)",
+        "realimentacao": [
+          "PLC_IN: AP155(I-00)=1 (ALARME TÉRMICO ELEVADOR) | CHECK: diagnóstico entrada I-00 e contato auxiliar do QM87(13-14)",
+          "PLC_IN: AP155(I-01)=1 (SENSOR ELEVADOR ALTO) | CHECK: diagnóstico entrada I-01 e sensor BF252",
+          "PLC_IN: AP155(I-02)=1 (SENSOR ELEVADOR BAIXO) | CHECK: diagnóstico entrada I-02 e sensor SQ253",
+          "HARDWIRED: QM87(aux 13-14/?) (alarme) | CHECK: coerência entre disparo do QM87 e I-00"
+        ]
+      }
+    },
+    {
+      "nome": "YV382 - Eletroválvula desce elevador (via driver KA382)",
+      "potencia": {
+        "sequencia": [
+          "24VDC:+24/O24 -> KA382(OUT) -> 36F1(1A) -> X1(3822) -> XT220(8) -> MURR22.0(8) -> YV382(A1) ; retorno -> O24 -> YV382(A2)"
+        ],
+        "protecao": [
+          "36F1",
+          "KA382"
+        ]
+      },
+      "comando": {
+        "fonte": "24VDC:+24/O24 (AP157 + KA382)",
+        "permissivos": [
+          "PLC_OUT: AP157(O-19)=1 (DESCE ELEVADOR) | CHECK: LED do canal O-19 no módulo AP157 e sinal em KA382(A1)",
+          "HARDWIRED: 36F1(1A)=OK | CHECK: continuidade do fusível e tensão pós-fusível em X1(3822)",
+          "HARDWIRED: +24V presente | CHECK: medir 24V em KA382(+V) e em saída KA382(OUT) quando comandado"
+        ],
+        "elemento_acionamento": "24VDC:+24/O24 -> AP157(O-19) -> KA382(A1) ; retorno -> O24 -> KA382(A2) || 24VDC:+24/O24 -> KA382(OUT) -> 36F1(1A) -> X1(3822) -> MURR22.0(8) -> YV382(A1) ; retorno -> O24 -> YV382(A2)",
+        "realimentacao": [
+          "NÃO INDICADO NO DIAGRAMA"
+        ]
+      }
+    },
+    {
+      "nome": "M91 - Motor transportador 1 (inversor UF92)",
+      "potencia": {
+        "sequencia": [
+          "440VAC:L1/L2/L3 -> QS10(1-2/3-4/5-6) -> KM526(1-2/3-4/5-6) -> Barramento_1L1/1L2/1L3 -> QM91(1-2/3-4/5-6) -> UF92(L1/L2/L3) -> UF92(U/V/W) -> TM91(1-U921/2-V922/3-W923/PE) -> M91(U/V/W/PE)"
+        ],
+        "protecao": [
+          "QM91",
+          "UF92"
+        ]
+      },
+      "comando": {
+        "fonte": "ASSUMIDO:Ethernet + 24VDC de controle do inversor",
+        "permissivos": [
+          "SAFETY: AP524 -> KM526 energizado -> Barramento_1L presente | CHECK: estado KM526 e medição 440VAC em QM91(1/3/5)",
+          "HARDWIRED: QM91(ajuste 4.5A)=ligado | CHECK: posição do disjuntor-motor QM91 e tensão em UF92(L1/L2/L3)",
+          "UNKNOWN: ASSUMIDO: comando START/RUN via Ethernet ETH4 no UF92 | CHECK: status de comunicação/Run no inversor UF92 e no PLC"
+        ],
+        "elemento_acionamento": "ASSUMIDO:ETHERNET -> AP134 -> UF92(ETH4)",
+        "realimentacao": [
+          "PLC_IN: AP155(I-10)=1 (PARADA DE PALET TRANSPORTADOR 1) | CHECK: diagnóstico entrada I-10 e sensor BF262",
+          "UNKNOWN: Feedback RUN/FAULT do UF92 - NÃO INDICADO NO DIAGRAMA (provável via Ethernet)"
+        ]
+      }
+    },
+    {
+      "nome": "M96 - Motor transportador 2 (inversor UF96)",
+      "potencia": {
+        "sequencia": [
+          "440VAC:L1/L2/L3 -> QS10(1-2/3-4/5-6) -> KM526(1-2/3-4/5-6) -> Barramento_1L1/1L2/1L3 -> QM96(1-2/3-4/5-6) -> UF96(L1/L2/L3) -> UF96(U/V/W) -> TM96(1-U961/2-V962/3-W963/PE) -> M96(U/V/W/PE)"
+        ],
+        "protecao": [
+          "QM96",
+          "UF96"
+        ]
+      },
+      "comando": {
+        "fonte": "ASSUMIDO:Ethernet + 24VDC de controle do inversor",
+        "permissivos": [
+          "SAFETY: AP524 -> KM526 energizado -> Barramento_1L presente | CHECK: estado KM526 e medição 440VAC em QM96(1/3/5)",
+          "HARDWIRED: QM96(ajuste 4.5A)=ligado | CHECK: posição do disjuntor-motor QM96 e tensão em UF96(L1/L2/L3)",
+          "UNKNOWN: ASSUMIDO: comando START/RUN via Ethernet ETH15 no UF96 | CHECK: status de comunicação/Run no inversor UF96 e no PLC"
+        ],
+        "elemento_acionamento": "ASSUMIDO:ETHERNET -> AP134 -> UF96(ETH15)",
+        "realimentacao": [
+          "PLC_IN: AP155(I-11)=1 (PARADA DE PALET TRANSPORTADOR 2) | CHECK: diagnóstico entrada I-11 e sensor BF263",
+          "UNKNOWN: Feedback RUN/FAULT do UF96 - NÃO INDICADO NO DIAGRAMA (provável via Ethernet)"
+        ]
+      }
+    },
+    {
+      "nome": "M101 - Motor transportador 3 (elevador) (inversor UF101)",
+      "potencia": {
+        "sequencia": [
+          "440VAC:L1/L2/L3 -> QS10(1-2/3-4/5-6) -> KM525(1-2/3-4/5-6) -> Barramento_2L1/2L2/2L3 -> QM101(1-2/3-4/5-6) -> UF101(L1/L2/L3) -> UF101(U/V/W) -> TM101(1-U1011/2-V1012/3-W1013/PE) -> M101(U/V/W/PE)"
+        ],
+        "protecao": [
+          "QM101",
+          "UF101"
+        ]
+      },
+      "comando": {
+        "fonte": "ASSUMIDO:Ethernet + 24VDC de controle do inversor",
+        "permissivos": [
+          "SAFETY: AP524 -> KM525 energizado -> Barramento_2L presente | CHECK: estado KM525 e medição 440VAC em QM101(1/3/5)",
+          "HARDWIRED: QM101(ajuste 6.5A)=ligado | CHECK: posição do disjuntor-motor QM101 e tensão em UF101(L1/L2/L3)",
+          "UNKNOWN: ASSUMIDO: comando START/RUN via Ethernet ETH5 no UF101 | CHECK: status de comunicação/Run no inversor UF101 e no PLC"
+        ],
+        "elemento_acionamento": "ASSUMIDO:ETHERNET -> AP134 -> UF101(ETH5)",
+        "realimentacao": [
+          "PLC_IN: AP151(I-13)=1 (PARADA DE PALET/START CICLO TRANSPORTADOR 3) | CHECK: diagnóstico entrada I-13 e sensores BF224/BF225/BF226",
+          "UNKNOWN: Feedback RUN/FAULT do UF101 - NÃO INDICADO NO DIAGRAMA (provável via Ethernet)"
+        ]
+      }
+    },
+    {
+      "nome": "M102 - Motor transportador 4 (inversor UF102)",
+      "potencia": {
+        "sequencia": [
+          "440VAC:L1/L2/L3 -> QS10(1-2/3-4/5-6) -> KM525(1-2/3-4/5-6) -> Barramento_2L1/2L2/2L3 -> QM102(1-2/3-4/5-6) -> UF102(L1/L2/L3) -> UF102(U/V/W) -> TM102(1-U1021/2-V1022/3-W1023/PE) -> M102(U/V/W/PE)"
+        ],
+        "protecao": [
+          "QM102",
+          "UF102"
+        ]
+      },
+      "comando": {
+        "fonte": "ASSUMIDO:Ethernet + 24VDC de controle do inversor",
+        "permissivos": [
+          "SAFETY: AP524 -> KM525 energizado -> Barramento_2L presente | CHECK: estado KM525 e medição 440VAC em QM102(1/3/5)",
+          "HARDWIRED: QM102(ajuste 4.5A)=ligado | CHECK: posição do disjuntor-motor QM102 e tensão em UF102(L1/L2/L3)",
+          "UNKNOWN: ASSUMIDO: comando START/RUN via Ethernet ETH7 no UF102 | CHECK: status de comunicação/Run no inversor UF102 e no PLC"
+        ],
+        "elemento_acionamento": "ASSUMIDO:ETHERNET -> AP134 -> UF102(ETH7)",
+        "realimentacao": [
+          "PLC_IN: AP155(I-12)=1 (PARADA DE PALET TRANSPORTADOR 4) | CHECK: diagnóstico entrada I-12 e sensor BF264",
+          "UNKNOWN: Feedback RUN/FAULT do UF102 - NÃO INDICADO NO DIAGRAMA (provável via Ethernet)"
+        ]
+      }
+    },
+    {
+      "nome": "M106 - Motor transportador 5 (inversor UF106)",
+      "potencia": {
+        "sequencia": [
+          "440VAC:L1/L2/L3 -> QS10(1-2/3-4/5-6) -> KM525(1-2/3-4/5-6) -> Barramento_2L1/2L2/2L3 -> QM106(1-2/3-4/5-6) -> UF106(L1/L2/L3) -> UF106(U/V/W) -> TM106(1-U1061/2-V1062/3-W1063/PE) -> M106(U/V/W/PE)"
+        ],
+        "protecao": [
+          "QM106",
+          "UF106"
+        ]
+      },
+      "comando": {
+        "fonte": "ASSUMIDO:Ethernet + 24VDC de controle do inversor",
+        "permissivos": [
+          "SAFETY: AP524 -> KM525 energizado -> Barramento_2L presente | CHECK: estado KM525 e medição 440VAC em QM106(1/3/5)",
+          "HARDWIRED: QM106(ajuste 4.5A)=ligado | CHECK: posição do disjuntor-motor QM106 e tensão em UF106(L1/L2/L3)",
+          "UNKNOWN: ASSUMIDO: comando START/RUN via Ethernet ETH6 no UF106 | CHECK: status de comunicação/Run no inversor UF106 e no PLC"
+        ],
+        "elemento_acionamento": "ASSUMIDO:ETHERNET -> AP134 -> UF106(ETH6)",
+        "realimentacao": [
+          "PLC_IN: AP155(I-13)=1 (PARADA DE PALET TRANSPORTADOR 5) | CHECK: diagnóstico entrada I-13 e sensor BF265",
+          "UNKNOWN: Feedback RUN/FAULT do UF106 - NÃO INDICADO NO DIAGRAMA (provável via Ethernet)"
+        ]
+      }
+    },
+    {
+      "nome": "M107 - Motor transportador 6 (inversor UF107)",
+      "potencia": {
+        "sequencia": [
+          "440VAC:L1/L2/L3 -> QS10(1-2/3-4/5-6) -> KM525(1-2/3-4/5-6) -> Barramento_2L1/2L2/2L3 -> QM107(1-2/3-4/5-6) -> UF107(L1/L2/L3) -> UF107(U/V/W) -> TM107(1-U1071/2-V1072/3-W1073/PE) -> M107(U/V/W/PE)"
+        ],
+        "protecao": [
+          "QM107",
+          "UF107"
+        ]
+      },
+      "comando": {
+        "fonte": "ASSUMIDO:Ethernet + 24VDC de controle do inversor",
+        "permissivos": [
+          "SAFETY: AP524 -> KM525 energizado -> Barramento_2L presente | CHECK: estado KM525 e medição 440VAC em QM107(1/3/5)",
+          "HARDWIRED: QM107(ajuste 4.5A)=ligado | CHECK: posição do disjuntor-motor QM107 e tensão em UF107(L1/L2/L3)",
+          "UNKNOWN: ASSUMIDO: comando START/RUN via Ethernet ETH8 no UF107 | CHECK: status de comunicação/Run no inversor UF107 e no PLC"
+        ],
+        "elemento_acionamento": "ASSUMIDO:ETHERNET -> AP134 -> UF107(ETH8)",
+        "realimentacao": [
+          "PLC_IN: AP155(I-14)=1 (PARADA DE PALET TRANSPORTADOR 6) | CHECK: diagnóstico entrada I-14 e sensor BF266",
+          "UNKNOWN: Feedback RUN/FAULT do UF107 - NÃO INDICADO NO DIAGRAMA (provável via Ethernet)"
+        ]
+      }
+    },
+    {
+      "nome": "M111 - Motor transportador 7 (inversor UF111)",
+      "potencia": {
+        "sequencia": [
+          "440VAC:L1/L2/L3 -> QS10(1-2/3-4/5-6) -> KM525(1-2/3-4/5-6) -> Barramento_2L1/2L2/2L3 -> QM111(1-2/3-4/5-6) -> UF111(L1/L2/L3) -> UF111(U/V/W) -> TM111(1-U1111/2-V1112/3-W1113/PE) -> M111(U/V/W/PE)"
+        ],
+        "protecao": [
+          "QM111",
+          "UF111"
+        ]
+      },
+      "comando": {
+        "fonte": "ASSUMIDO:Ethernet + 24VDC de controle do inversor",
+        "permissivos": [
+          "SAFETY: AP524 -> KM525 energizado -> Barramento_2L presente | CHECK: estado KM525 e medição 440VAC em QM111(1/3/5)",
+          "HARDWIRED: QM111(ajuste 4.5A)=ligado | CHECK: posição do disjuntor-motor QM111 e tensão em UF111(L1/L2/L3)",
+          "UNKNOWN: ASSUMIDO: comando START/RUN via Ethernet ETH9 no UF111 | CHECK: status de comunicação/Run no inversor UF111 e no PLC"
+        ],
+        "elemento_acionamento": "ASSUMIDO:ETHERNET -> AP134 -> UF111(ETH9)",
+        "realimentacao": [
+          "PLC_IN: AP155(I-15)=1 (PARADA DE PALET TRANSPORTADOR 7) | CHECK: diagnóstico entrada I-15 e sensor BF267",
+          "UNKNOWN: Feedback RUN/FAULT do UF111 - NÃO INDICADO NO DIAGRAMA (provável via Ethernet)"
+        ]
+      }
+    },
+    {
+      "nome": "M27 - Ventilador quadro elétrico (230Vac)",
+      "potencia": {
+        "sequencia": [
+          "440VAC:L1/L2/L3 -> QS10(1-2/3-4/5-6) -> 0L1/0L2/0L3 -> QF21(10A) -> TV21(primário 0L/380) -> TV21(secundário 220=L4/L5) -> QF27(2A) -> ST27(3-4) -> M27(U/V)"
+        ],
+        "protecao": [
+          "QF21",
+          "TV21",
+          "QF27"
+        ]
+      },
+      "comando": {
+        "fonte": "230VAC:L4/L5 (via TV21)",
+        "permissivos": [
+          "HARDWIRED: QF21(10A)=ligado | CHECK: posição do QF21 e tensão no secundário do TV21 (L4/L5)",
+          "HARDWIRED: QF27(2A)=ligado | CHECK: posição do QF27 e tensão em ST27(3)",
+          "HARDWIRED: ST27=ON | CHECK: continuidade em ST27(3-4) e rotação do ventilador"
+        ],
+        "elemento_acionamento": "230VAC:L4/L5 -> QF27(1-2) -> ST27(3-4) -> M27(U) ; retorno -> L4 -> M27(V)",
+        "realimentacao": [
+          "NÃO INDICADO NO DIAGRAMA"
+        ]
+      }
+    },
+    {
+      "nome": "RR121/RR122 - Tampão soldante envolvedora (AP124 + KV126 + KM505)",
+      "potencia": {
+        "sequencia": [
+          "440VAC:L1/L2/L3 -> QS10(1-2/3-4/5-6) -> 0L1/0L2/0L3 -> QF21(10A) -> TV21(primário 0L/380) -> TV21(secundário 220=L4/L5) -> QF121(4A) -> KM505(1-2/3-4) -> 1251 -> KV126(1-2~AC) -> 1261 -> XT120(2) -> RR122(200W) -> (junção) -> RR121(200W) -> XT120(1) -> 1221 -> retorno -> KM505 -> QF121 -> L4/L5"
+        ],
+        "protecao": [
+          "QF121",
+          "KM505",
+          "KV126",
+          "RR121",
+          "RR122"
+        ]
+      },
+      "comando": {
+        "fonte": "24VDC:24V/O24 (AP157) + 440VAC/L4-L5 (via QS10/QF21/TV21)",
+        "permissivos": [
+          "PLC_OUT: AP157(O-02)=1 (ALIMENTAÇÃO TERMOREGULADOR) | CHECK: LED do canal O-02 no AP157 e tensão 24V em AP124(SUPPLY 9/12)",
+          "SAFETY: AP503(G953-201)=OK -> KM505 energizado | CHECK: LEDs do AP503 e presença de tensão em KM505(A1/A2)",
+          "HARDWIRED: QF121(4A)=ligado | CHECK: posição do QF121 e tensão em KM505(entradas 1/3)",
+          "HARDWIRED: BT124(TERMOPAR)=conectado | CHECK: continuidade/correta polaridade em XT120(5=1271 / 6=1281) e leitura no AP124"
+        ],
+        "elemento_acionamento": "24VDC:+24/O24 -> AP157(O-02) -> 3731 -> AP124(SUPPLY 9) ; retorno -> O24 -> AP124(SUPPLY 12) || AP124(OUT5 1-2) -> KV126(3+/4-) || SAFETY: AP503(14) -> KM505(A1) ; retorno -> O24 -> KM505(A2)",
+        "realimentacao": [
+          "PLC_IN: AP151(I-17)=1 (TAMPAS SOLDANTES EM TEMPERATURA) | CHECK: diagnóstico entrada I-17 (sinal 2341) e estado OUT1 do AP124",
+          "UNKNOWN: ciclo de controle de temperatura interno do AP124 - NÃO INDICADO NO DIAGRAMA (parâmetros/setpoint)"
+        ]
+      }
+    },
+    {
+      "nome": "YV361 - Eletroválvula envolvedora (AVANÇA TAMPAS SOLDANTES)",
+      "potencia": {
+        "sequencia": [
+          "24VDC:24V3/O24 -> AP151(O-13) -> 36F1(1A) -> X1(3611) -> XT360(1) -> MURR36.1(1) -> YV361(A1) ; retorno -> O24 -> YV361(A2)"
+        ],
+        "protecao": [
+          "36F1",
+          "X1(3611)"
+        ]
+      },
+      "comando": {
+        "fonte": "24VDC:24V3/O24",
+        "permissivos": [
+          "PLC_OUT: AP151(O-13)=1 | CHECK: LED do canal AP151(O-13) no AP151 e tensão em YV361(A1)",
+          "HARDWIRED: 36F1(1A)=OK | CHECK: continuidade do fusível correspondente e tensão pós-fusível em X1",
+          "HARDWIRED: 24V3 presente | CHECK: medir 24V3 no barramento/borne X1",
+          "UNKNOWN: ASSUMIDO: 24V3 é condicionado por segurança (AP503/AP524) | CHECK: medir 24V3 com safety atuado"
+        ],
+        "elemento_acionamento": "24VDC:24V3/O24 -> AP151(O-13) -> 36F1(1A) -> X1(3611) -> XT360(1) -> MURR36.1(1) -> YV361(A1) ; retorno -> O24 -> YV361(A2)",
+        "realimentacao": [
+          "NÃO INDICADO NO DIAGRAMA"
+        ]
+      }
+    },
+    {
+      "nome": "YV362 - Eletroválvula envolvedora (AVANÇA CORTE)",
+      "potencia": {
+        "sequencia": [
+          "24VDC:24V3/O24 -> AP151(O-14) -> 36F1(1A) -> X1(3621) -> XT360(2) -> MURR36.1(2) -> YV362(A1) ; retorno -> O24 -> YV362(A2)"
+        ],
+        "protecao": [
+          "36F1",
+          "X1(3621)"
+        ]
+      },
+      "comando": {
+        "fonte": "24VDC:24V3/O24",
+        "permissivos": [
+          "PLC_OUT: AP151(O-14)=1 | CHECK: LED do canal AP151(O-14) no AP151 e tensão em YV362(A1)",
+          "HARDWIRED: 36F1(1A)=OK | CHECK: continuidade do fusível correspondente e tensão pós-fusível em X1",
+          "HARDWIRED: 24V3 presente | CHECK: medir 24V3 no barramento/borne X1",
+          "UNKNOWN: ASSUMIDO: 24V3 é condicionado por segurança (AP503/AP524) | CHECK: medir 24V3 com safety atuado"
+        ],
+        "elemento_acionamento": "24VDC:24V3/O24 -> AP151(O-14) -> 36F1(1A) -> X1(3621) -> XT360(2) -> MURR36.1(2) -> YV362(A1) ; retorno -> O24 -> YV362(A2)",
+        "realimentacao": [
+          "NÃO INDICADO NO DIAGRAMA"
+        ]
+      }
+    },
+    {
+      "nome": "YV363 - Eletroválvula envolvedora (DESCIDA DA PINÇA)",
+      "potencia": {
+        "sequencia": [
+          "24VDC:24V3/O24 -> AP151(O-15) -> 36F1(1A) -> X1(3631) -> XT360(3) -> MURR36.1(3) -> YV363(A1) ; retorno -> O24 -> YV363(A2)"
+        ],
+        "protecao": [
+          "36F1",
+          "X1(3631)"
+        ]
+      },
+      "comando": {
+        "fonte": "24VDC:24V3/O24",
+        "permissivos": [
+          "PLC_OUT: AP151(O-15)=1 | CHECK: LED do canal AP151(O-15) no AP151 e tensão em YV363(A1)",
+          "HARDWIRED: 36F1(1A)=OK | CHECK: continuidade do fusível correspondente e tensão pós-fusível em X1",
+          "HARDWIRED: 24V3 presente | CHECK: medir 24V3 no barramento/borne X1",
+          "UNKNOWN: ASSUMIDO: 24V3 é condicionado por segurança (AP503/AP524) | CHECK: medir 24V3 com safety atuado"
+        ],
+        "elemento_acionamento": "24VDC:24V3/O24 -> AP151(O-15) -> 36F1(1A) -> X1(3631) -> XT360(3) -> MURR36.1(3) -> YV363(A1) ; retorno -> O24 -> YV363(A2)",
+        "realimentacao": [
+          "NÃO INDICADO NO DIAGRAMA"
+        ]
+      }
+    },
+    {
+      "nome": "YV364 - Eletroválvula envolvedora (ABERTURA DA PINÇA)",
+      "potencia": {
+        "sequencia": [
+          "24VDC:24V3/O24 -> AP151(O-16) -> 36F1(1A) -> X1(3641) -> XT360(4) -> MURR36.1(4) -> YV364(A1) ; retorno -> O24 -> YV364(A2)"
+        ],
+        "protecao": [
+          "36F1",
+          "X1(3641)"
+        ]
+      },
+      "comando": {
+        "fonte": "24VDC:24V3/O24",
+        "permissivos": [
+          "PLC_OUT: AP151(O-16)=1 | CHECK: LED do canal AP151(O-16) no AP151 e tensão em YV364(A1)",
+          "HARDWIRED: 36F1(1A)=OK | CHECK: continuidade do fusível correspondente e tensão pós-fusível em X1",
+          "HARDWIRED: 24V3 presente | CHECK: medir 24V3 no barramento/borne X1",
+          "UNKNOWN: ASSUMIDO: 24V3 é condicionado por segurança (AP503/AP524) | CHECK: medir 24V3 com safety atuado"
+        ],
+        "elemento_acionamento": "24VDC:24V3/O24 -> AP151(O-16) -> 36F1(1A) -> X1(3641) -> XT360(4) -> MURR36.1(4) -> YV364(A1) ; retorno -> O24 -> YV364(A2)",
+        "realimentacao": [
+          "NÃO INDICADO NO DIAGRAMA"
+        ]
+      }
+    },
+    {
+      "nome": "YV365 - Eletroválvula envolvedora (RECUA BRAÇO DE CORTE)",
+      "potencia": {
+        "sequencia": [
+          "24VDC:24V3/O24 -> AP151(O-17) -> 36F1(1A) -> X1(3651) -> XT360(5) -> MURR36.1(5) -> YV365(A1) ; retorno -> O24 -> YV365(A2)"
+        ],
+        "protecao": [
+          "36F1",
+          "X1(3651)"
+        ]
+      },
+      "comando": {
+        "fonte": "24VDC:24V3/O24",
+        "permissivos": [
+          "PLC_OUT: AP151(O-17)=1 | CHECK: LED do canal AP151(O-17) no AP151 e tensão em YV365(A1)",
+          "HARDWIRED: 36F1(1A)=OK | CHECK: continuidade do fusível correspondente e tensão pós-fusível em X1",
+          "HARDWIRED: 24V3 presente | CHECK: medir 24V3 no barramento/borne X1",
+          "UNKNOWN: ASSUMIDO: 24V3 é condicionado por segurança (AP503/AP524) | CHECK: medir 24V3 com safety atuado"
+        ],
+        "elemento_acionamento": "24VDC:24V3/O24 -> AP151(O-17) -> 36F1(1A) -> X1(3651) -> XT360(5) -> MURR36.1(5) -> YV365(A1) ; retorno -> O24 -> YV365(A2)",
+        "realimentacao": [
+          "NÃO INDICADO NO DIAGRAMA"
+        ]
+      }
+    },
+    {
+      "nome": "YV366 - Eletroválvula envolvedora (AVANÇA BRAÇO DE CORTE)",
+      "potencia": {
+        "sequencia": [
+          "24VDC:24V3/O24 -> AP151(O-18) -> 36F1(1A) -> X1(3661) -> XT360(6) -> MURR36.1(6) -> YV366(A1) ; retorno -> O24 -> YV366(A2)"
+        ],
+        "protecao": [
+          "36F1",
+          "X1(3661)"
+        ]
+      },
+      "comando": {
+        "fonte": "24VDC:24V3/O24",
+        "permissivos": [
+          "PLC_OUT: AP151(O-18)=1 | CHECK: LED do canal AP151(O-18) no AP151 e tensão em YV366(A1)",
+          "HARDWIRED: 36F1(1A)=OK | CHECK: continuidade do fusível correspondente e tensão pós-fusível em X1",
+          "HARDWIRED: 24V3 presente | CHECK: medir 24V3 no barramento/borne X1",
+          "UNKNOWN: ASSUMIDO: 24V3 é condicionado por segurança (AP503/AP524) | CHECK: medir 24V3 com safety atuado"
+        ],
+        "elemento_acionamento": "24VDC:24V3/O24 -> AP151(O-18) -> 36F1(1A) -> X1(3661) -> XT360(6) -> MURR36.1(6) -> YV366(A1) ; retorno -> O24 -> YV366(A2)",
+        "realimentacao": [
+          "NÃO INDICADO NO DIAGRAMA"
+        ]
+      }
+    },
+    {
+      "nome": "YV367 - Eletroválvula envolvedora (SOPRO DA PINÇA)",
+      "potencia": {
+        "sequencia": [
+          "24VDC:24V3/O24 -> AP151(O-19) -> 36F1(1A) -> X1(3671) -> XT360(7) -> MURR36.1(7) -> YV367(A1) ; retorno -> O24 -> YV367(A2)"
+        ],
+        "protecao": [
+          "36F1",
+          "X1(3671)"
+        ]
+      },
+      "comando": {
+        "fonte": "24VDC:24V3/O24",
+        "permissivos": [
+          "PLC_OUT: AP151(O-19)=1 | CHECK: LED do canal AP151(O-19) no AP151 e tensão em YV367(A1)",
+          "HARDWIRED: 36F1(1A)=OK | CHECK: continuidade do fusível correspondente e tensão pós-fusível em X1",
+          "HARDWIRED: 24V3 presente | CHECK: medir 24V3 no barramento/borne X1",
+          "UNKNOWN: ASSUMIDO: 24V3 é condicionado por segurança (AP503/AP524) | CHECK: medir 24V3 com safety atuado"
+        ],
+        "elemento_acionamento": "24VDC:24V3/O24 -> AP151(O-19) -> 36F1(1A) -> X1(3671) -> XT360(7) -> MURR36.1(7) -> YV367(A1) ; retorno -> O24 -> YV367(A2)",
+        "realimentacao": [
+          "NÃO INDICADO NO DIAGRAMA"
+        ]
+      }
+    },
+    {
+      "nome": "SB241 - Lâmpada marcha",
+      "potencia": {
+        "sequencia": [
+          "24VDC:+24/O24 -> AP157(O-00) -> X1(3711) -> SB241(X1) ; retorno -> O24 -> SB241(X2)"
+        ],
+        "protecao": [
+          "QF53",
+          "AP157"
+        ]
+      },
+      "comando": {
+        "fonte": "24VDC:+24/O24",
+        "permissivos": [
+          "PLC_OUT: AP157(O-00)=1 (LÂMPADA MARCHA) | CHECK: LED do canal O-00 no AP157 e tensão em SB241(X1)",
+          "HARDWIRED: +24V presente | CHECK: medir 24V no barramento 24V"
+        ],
+        "elemento_acionamento": "24VDC:+24/O24 -> AP157(O-00) -> X1(3711) -> SB241(X1) ; retorno -> O24 -> SB241(X2)",
+        "realimentacao": [
+          "NÃO INDICADO NO DIAGRAMA"
+        ]
+      }
+    },
+    {
+      "nome": "HL372 - Lâmpada alarme",
+      "potencia": {
+        "sequencia": [
+          "24VDC:+24/O24 -> AP157(O-01) -> X1(3721) -> HL372(X1) ; retorno -> O24 -> HL372(X2)"
+        ],
+        "protecao": [
+          "QF53",
+          "AP157"
+        ]
+      },
+      "comando": {
+        "fonte": "24VDC:+24/O24",
+        "permissivos": [
+          "PLC_OUT: AP157(O-01)=1 (LÂMPADA ALARME) | CHECK: LED do canal O-01 no AP157 e tensão em HL372(X1)",
+          "HARDWIRED: +24V presente | CHECK: medir 24V no barramento 24V"
+        ],
+        "elemento_acionamento": "24VDC:+24/O24 -> AP157(O-01) -> X1(3721) -> HL372(X1) ; retorno -> O24 -> HL372(X2)",
+        "realimentacao": [
+          "NÃO INDICADO NO DIAGRAMA"
+        ]
+      }
+    },
+    {
+      "nome": "SB375 - Sinaleiro (verde/vermelho/amarelo)",
+      "potencia": {
+        "sequencia": [
+          "24VDC:+24/O24 -> AP157(O-05) -> X(3761) -> SB375(VERDE) ; retorno -> O24",
+          "24VDC:+24/O24 -> AP157(O-06) -> X(3771) -> SB375(VERMELHO) ; retorno -> O24",
+          "24VDC:+24/O24 -> AP157(O-07) -> X(3781) -> SB375(AMARELO) ; retorno -> O24"
+        ],
+        "protecao": [
+          "QF53",
+          "AP157"
+        ]
+      },
+      "comando": {
+        "fonte": "24VDC:+24/O24",
+        "permissivos": [
+          "PLC_OUT: AP157(O-05)=1 | CHECK: LED do canal O-05 no AP157 e tensão em X(3761)",
+          "PLC_OUT: AP157(O-06)=1 | CHECK: LED do canal O-06 no AP157 e tensão em X(3771)",
+          "PLC_OUT: AP157(O-07)=1 | CHECK: LED do canal O-07 no AP157 e tensão em X(3781)",
+          "HARDWIRED: borneira X (3761/3771/3781) conectada ao sinaleiro | CHECK: continuidade da borneira até SB375"
+        ],
+        "elemento_acionamento": "24VDC:+24/O24 -> AP157(O-05/O-06/O-07) -> X(3761/3771/3781) -> SB375(VERDE/VERMELHO/AMARELO) ; retorno -> O24",
+        "realimentacao": [
+          "NÃO INDICADO NO DIAGRAMA"
+        ]
+      }
+    }
+  ],
+  "intertravamentos": [
+    "SAFETY: AP503(WEG G953-201) monitora emergências SB501/1(CH1) e SB501/2(CH2) + reset/marcha SB507 -> habilita saídas de segurança (13-14/23-24/33-34) e energiza KM505(A1/A2)",
+    "SAFETY: AP524(WEG G953-201) monitora SQ520(fim de curso segurança portas) em CH1/CH2 + permissivos via KA565/KA566 + reset SB528 -> energiza KM525(A1/A2) e KM526(A1/A2) (habilita barramentos 2L e 1L)",
+    "SAFETY: Barreira multing saída BT541(transmissor)/BR542(receptor) fornece OSSD1/OSSD2 (5431/5432) -> AP564 (entradas de segurança) -> comanda relés KA565/KA566/KA567/KA568",
+    "SAFETY: KA565(55.3, 11-12) e KA566(55.3, 41-42) são usados como canais de permissão para AP524 (segurança acesso máquina)",
+    "SAFETY: ASSUMIDO: 24V3 é um barramento de atuadores condicionado pela cadeia de segurança (AP503/AP524); perda de safety remove 24V3 e desenergiza válvulas (inclui YV529 e YV361..YV367)",
+    "HARDWIRED: BYPASS MULTING SAÍDA via SB276 -> KA277(contatos 11-12 e 41-42) influencia lógica de multing no AP564",
+    "PLC_OUT: AP151(O-08) -> KA319 (BY PASS MULTING SAIDA) influencia permissivos de multing (contatos KA319 21-22 referenciados no circuito AP564)"
+  ],
+  "pontos_falha_criticos": [
+    "FALHA ÚNICA: QS10 (seccionadora geral 22-32A) - desligamento remove 440VAC para todo o painel | CHECK: medir tensão a montante/jusante e verificar posição mecânica",
+    "FALHA ÚNICA: GS51 (fonte 24VDC Siemens GEP1434-2BA20) ou QM51 - perda derruba PLC/AP151, AP157 e todos os atuadores 24V | CHECK: LED PSU e tensão 24V/O24",
+    "FALHA ÚNICA: QF52(4A) e QF53(6A) - abertura remove alimentação de PLC/IO/saídas (dependendo do ramal) | CHECK: continuidade do fusível/disjuntor e tensão pós-QF",
+    "FALHA ÚNICA: AP503 e AP524 (relés de segurança) - falha impede habilitação KM505 e/ou KM525/KM526 | CHECK: LEDs/diagnóstico dos módulos G953-201 e teste de reset",
+    "FALHA ÚNICA: KM525/KM526 - contato colado pode manter barramentos 2L/1L energizados mesmo com safety desarmado | CHECK: teste de desligamento/abertura com medição de tensão pós-contator",
+    "FALHA ÚNICA: AP134 (switch Ethernet) - perda de comunicação pode impedir comando/diagnóstico dos inversores UF63/UF73/UF83/UF92/UF96/UF101/UF102/UF106/UF107/UF111 | CHECK: LEDs de link e diagnóstico de rede",
+    "FALHA: 36F1(1A) aparece em múltiplos canais (fusíveis individuais de válvulas) - fusível aberto causa falha pontual (válvula específica, incluindo linhas XT360 e a saída KA382 para YV382) | CHECK: medir 24V pós-fusível em X1/XT360/X1(3822)",
+    "FALHA: KV126(SSR 25A) - pode falhar ABERTO (sem aquecimento) ou EM CURTO (aquecimento contínuo) | CHECK: medir corrente/tensão no tampão soldante e estado do comando OUT5 do AP124",
+    "FALHA: Contatores KM312/KM313 (freio) - falha impede liberação de freio dos motores M63/M73 | CHECK: estado do contator, tensão em YB63/YB73 e resposta mecânica do freio",
+    "INCONSISTÊNCIA POSSÍVEL: Terminais DI1/DI2/DI3/DI4 dos inversores UFxx não possuem fiação nas folhas apresentadas; START/RUN pode ser via Ethernet ou outra folha não fornecida | CHECK: parametrização do PowerFlex e cabeamento real de DI/COM",
+    "INCONSISTÊNCIA POSSÍVEL: Origem/condicionamento do barramento 24V3 não está explicitamente detalhado nas folhas apresentadas | CHECK: rastrear 24V3 até sua fonte (possível contato de segurança) e validar comportamento em E-stop/porta",
+    "PONTO CRÍTICO: QM87 (elevador) - disparo gera alarme em AP155(I-00) e impede subida | CHECK: reset do QM87 e inspeção mecânica do elevador/bomba",
+    "PONTO CRÍTICO: TV21 (transformador 2000VA) - perda remove 230VAC (L4/L5) para ventilação, iluminação e aquecimento | CHECK: tensão primário/ secundário e QF21"
+  ]
+}
