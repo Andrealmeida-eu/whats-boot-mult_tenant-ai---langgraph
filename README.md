@@ -1,103 +1,45 @@
-# WhatsApp AI Bot (produção simples, 1 tenant)
+# 🍔 Assistente Virtual Inteligente para Delivery (WhatsApp AI Bot)
 
-Este projeto é uma versão **simples e vendável** para produção:
-- **1 tenant por VPS**
-- Webhooks prontos:
-  - **Evolution:** `POST /webhook/evolution` (com **Segurança 1**: `X-Tenant-Secret`)
-  - **Meta Cloud:** `GET /webhook/meta` (verificação) e `POST /webhook/meta` (assinatura)
-- Buffer + debounce (evita responder “picado”)
-- Dedupe de webhook (evita resposta duplicada quando o provedor reenviar)
+![Python](https://img.shields.io/badge/Python-3.11+-blue?style=for-the-badge&logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)
+![Redis](https://img.shields.io/badge/redis-%23DD0031.svg?style=for-the-badge&logo=redis&logoColor=white)
+![LangChain](https://img.shields.io/badge/LangChain-1C3C3C?style=for-the-badge&logo=langchain)
+![OpenAI](https://img.shields.io/badge/OpenAI-412991.svg?style=for-the-badge&logo=OpenAI&logoColor=white)
 
-> Observação: O RAG usa pgvector (Postgres). As **embeddings** continuam em OpenAI por padrão.
+Um agente conversacional autônomo projetado para automatizar o atendimento de ponta a ponta de lanchonetes e restaurantes via WhatsApp. Construído com uma arquitetura assíncrona orientada a eventos, o bot não apenas conversa com o cliente, mas gerencia o estado do carrinho, negocia itens e processa o checkout de forma determinística, evitando "alucinações" comuns em LLMs.
 
----
+## 🚀 O Problema que Resolve
+Atendimentos manuais via WhatsApp geram gargalos em horários de pico, erros na anotação de pedidos e frustração para o cliente. Este projeto resolve isso através de um LLM que atua como um "garçom digital", orquestrado por um backend robusto que garante que os dados do pedido (itens, endereço, pagamento e troco) sejam estruturados e salvos perfeitamente no sistema da loja.
 
-## Rodar com Docker
+## 🧠 Diferenciais Técnicos (Enterprise-Grade)
 
-1) Configure o `.env`:
+Ao contrário de bots de IA simples que dependem apenas de prompt inicial, esta aplicação foi desenhada para cenários reais de alta concorrência:
 
-```bash
-cp .env .env
-```
+* **State-Driven Prompting:** O prompt do agente é injetado dinamicamente com base no estado atual do pedido no banco de dados (ex: `MONTANDO_PEDIDO`, `PRONTO_PARA_RESUMO`, `AGUARDANDO_CONFIRMACAO`). Isso garante que a IA siga regras de negócio estritas e não ofereça itens quando deveria estar fechando a venda.
+* **Gestão de Concorrência com Redis (Async Debounce):** Implementação de uma fila e debounce assíncrono para mensagens do WhatsApp. Se o cliente enviar 5 mensagens consecutivas em frações de segundo, o sistema consolida o buffer e faz uma única chamada ao LLM, otimizando o consumo de tokens (redução de custos) e evitando respostas duplicadas.
+* **Tool Calling Estrito (Pydantic):** A IA não interage com o banco de dados via texto livre. Ela é forçada a acionar ferramentas (`@tool`) tipadas para Adicionar ao Carrinho, Consultar Preço e Fazer Checkout, garantindo consistência total dos dados.
 
-2) Suba Postgres + Redis + Bot:
+## 🛠️ Principais Features
 
-```bash
-docker compose up -d --build
-```
+- [x] **Cardápio Dinâmico:** Apresentação inteligente de categorias e itens.
+- [x] **Gestão de Carrinho:** Adição, remoção e alteração de quantidades (Upsert/Incremento).
+- [x] **Validação de Horário de Funcionamento:** O bot reconhece os turnos da loja e recusa pedidos fora do horário.
+- [x] **Checkout Estruturado:** Captura de forma de pagamento (com cálculo de troco) e endereço completo.
+- [x] **Upsell Inteligente:** Sugere acompanhamentos ou bebidas sutilmente antes do fechamento.
+- [x] **Integração com Evolution API:** Conexão fluida com instâncias de WhatsApp.
 
-3) Teste:
+## 💻 Stack Tecnológica
 
-- `GET http://SEU_IP:8000/health`
-- Docs: `http://SEU_IP:8000/docs`
+* **Backend:** Python, FastAPI
+* **Orquestração de IA:** LangChain, OpenAI API (GPT-4o-mini)
+* **Cache e Mensageria:** Redis (Asyncio)
+* **Integração WhatsApp:** Evolution API
+* **Persistência de Dados:** SQLAlchemy / PostgreSQL (ou o banco que estiver usando)
 
----
+## ⚙️ Arquitetura do Fluxo
 
-## Configurar o webhook (Evolution)
-
-No `.env`:
-
-- `WHATSAPP_PROVIDER=evolution`
-
-Aponte o webhook da Evolution para:
-
-- URL: `http://SEU_IP:8000/webhook/evolution`
-- Header: `X-Tenant-Secret: <TENANT_SECRET do .env>`
-
-O bot ignora grupos (`@g.us`).
-
----
-
-## Configurar o webhook (Meta Cloud)
-
-No `.env`:
-
-- `WHATSAPP_PROVIDER=meta`
-- `META_VERIFY_TOKEN=...`
-- `META_APP_SECRET=...`
-- `META_PHONE_NUMBER_ID=...`
-- `META_ACCESS_TOKEN=...`
-
-### 1) Verificação do webhook
-No painel da Meta, configure o webhook para:
-
-- Verify URL: `http://SEU_IP:8000/webhook/meta`
-
-O endpoint responde ao desafio (`hub.challenge`) se `hub.verify_token` bater com `META_VERIFY_TOKEN`.
-
-### 2) Recebimento de mensagens
-O mesmo endpoint recebe eventos em:
-
-- `POST http://SEU_IP:8000/webhook/meta`
-
-E valida a assinatura `X-Hub-Signature-256` usando `META_APP_SECRET`.
-
----
-
-## Trocar provedor de LLM (OpenAI / Groq / Together)
-
-No `.env`:
-
-- `LLM_PROVIDER=openai` (default)
-- `LLM_PROVIDER=groq`
-- `LLM_PROVIDER=together`
-
-E coloque sua chave em `LLM_API_KEY`.
-
-> Esses provedores são **OpenAI-compatible**, então o código usa `base_url` automaticamente.
-
----
-
-## Ingestão de documentos (RAG)
-
-Coloque arquivos em:
-
-- `data/rag_files/default`
-
-Depois chame:
-
-- `POST /admin/ingest`
-
-Se você definir `ADMIN_API_KEY` no `.env`, envie header:
-
-- `X-API-Key: <ADMIN_API_KEY>`
+1. O cliente envia uma mensagem no WhatsApp.
+2. O webhook do FastAPI intercepta e enfileira no Redis (Debounce).
+3. O estado atual do cliente é consultado (Carrinho, Turno, Status).
+4. O `AgentExecutor` do LangChain avalia a intenção e aciona a `tool` necessária (ex: `gerenciar_carrinho(acao="checkout")`).
+5. O estado é atualizado no backend e a resposta humanizada volta para o WhatsApp.
