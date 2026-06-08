@@ -10,6 +10,8 @@ from fast_api.routes.api_restaurant.funcionamento import verificar_status_e_turn
 from fast_api.utils.agent_util import format_ai_output_gem
 from fast_api.core.agent.agent_debug import  invoke_with_debug
 from providers.factory import get_provider
+from fast_api.core.agent.graph_builder import build_graph
+from langchain_core.messages import HumanMessage, SystemMessag
 
 
 redis_client = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -18,7 +20,7 @@ debounce_tasks: dict[tuple[str, str], asyncio.Task] = {}
 debounce_tokens: dict[tuple[str, str], int] = {}
 chains_cache: dict[str, object] = {}
 
-
+graphs_cache = {}
 
 def log(*args):
     print("[BUFFER]", *args, flush=True)
@@ -116,21 +118,52 @@ async def handle_debounce(tenant_id: str, chat_id: str, token: int):
 
                 carrinho_dados = await buscar_resumo_carrinho_redis(tenant.id, chat_id)
                 log(f"carrinho resumo: {carrinho_dados}")
-                ctx = build_prompts(tenant, status, chat_id, carrinho_dados)
-                log(f"chamarei o invoke")
-                ai_response_obj = await invoke_with_debug(
-                    chain_with_history=ctx["chain_with_history"],
-                    get_session_history=ctx["get_session_history"],
-                    tenant_id=tenant_id,
-                    provider=provider,
-                    chat_id=chat_id,
-                    full_message=full_message,
-
+                
+                cache_key = f"{tenant_id}:{chat_id}"
+                
+                if cache_key not in graphs_cache:
+                    graphs_cache[cache_key] = build_graph(
+                        tenant,
+                        status,
+                        chat_id,
+                        carrinho_dados
+                    )
+                    
+                graphs_ctx = graphs_cache[cache_key]
+                graph = graphs_ctx["graph"]
+                
+                config = {
+                    "configurable": {
+                        "thread_id": f"{tenant_id}:{chat_id}"
+                    }
+                }
+                
+                input_state = {
+                    "messages": [
+                        HumanMessage(
+                            content=full_message
+                            )
+                        ],
+                    
+                    "tenant_id": tenant_id,
+                    "chat_id": chat_id,
+                    "current_step": "MENU",
+                    "cart": []
+                    
+                }
+                
+                result_graph = await graph.ainvoke(
+                    input_state,
+                    config=config
                 )
+                
+                
+                log(f"chamarei o invoke")
+                
+                ai_response = result_graph["messages"][-1]
 
                 log(f"voltei do invoke")
 
-                ai_response = format_ai_output_gem(ai_response_obj["output"])
                 response = ai_response.replace('**', '*')
                 log(f"voltei das formatação")
 
