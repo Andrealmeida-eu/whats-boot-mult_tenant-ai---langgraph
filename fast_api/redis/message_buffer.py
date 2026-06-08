@@ -2,16 +2,13 @@ import asyncio
 from contextlib import contextmanager
 import redis.asyncio as redis
 from fast_api.core.config.configapi import settings
-from fast_api.core.agent.agent import build_prompts
 from fast_api.core.database.conection.conection_orm import get_db
 from fast_api.core.database.model.base_tenant.tenantBase import Tenant
 from fast_api.redis.cart import buscar_resumo_carrinho_redis
 from fast_api.routes.api_restaurant.funcionamento import verificar_status_e_turno
-from fast_api.utils.agent_util import format_ai_output_gem
-from fast_api.core.agent.agent_debug import  invoke_with_debug
 from providers.factory import get_provider
 from fast_api.core.agent.graph_builder import build_graph
-from langchain_core.messages import HumanMessage, SystemMessag
+from langchain_core.messages import HumanMessage
 
 
 redis_client = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
