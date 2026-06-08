@@ -1,8 +1,9 @@
 # -> ChatPromptTemplate: estrutura prompts no formato de conversa (system/human/ai)
 # -> MessagesPlaceholder: “encaixe” onde o histórico será inserido dinamicamente
 
-from _datetime import datetime
 
+import textwrap as wrap
+from fast_api.redis.memory import get_session_history
 from fast_api.core.agent.tools import consultar_cardapio, consultar_status_pedido, lancar_pedido_sistema, \
     gerenciar_carrinho, enviar_resumo_pedido
 from fast_api.core.config.configapi import settings
@@ -13,75 +14,9 @@ from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.runnables import RunnableWithMessageHistory
 from langchain_openai import ChatOpenAI
 
+system_template = wrap.dedent(
+            """You are the virtual assistant for the diner {nome_loja}. 
 
-def build_prompts(tenant: Tenant, status_loja: dict, chat_id, carrinho: dict):
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
-    model = "gpt-5.4-mini-2026-03-17"
-
-    llm = ChatOpenAI(
-        model=model,
-        temperature=0.4,
-        api_key=settings.OPENAI_API_KEY
-    )
-
-    # Pegamos o status direto do dicionário que foi passado por parâmetro
-    status_pedido = carrinho.get("status")
-    lista_itens = carrinho.get("itens", [])
-
-    # Formata os itens de forma minimalisticamente textual para o System Prompt
-    texto_itens = ", ".join([f"{i['qty']}x {i['nome']}" for i in lista_itens]) if lista_itens else "Vazio"
-
-    if status_pedido == "PRONTO_PARA_RESUMO":
-        trava_seguranca = """
-            🚨 MODO RESTRITO ATIVADO 🚨
-                The customer has already chosen the items and provided delivery/payment details.
-                YOU ARE FORBIDDEN FROM ASKING NEW QUESTIONS OR OFFERING THE MENU.
-                YOUR ONLY PERMITTED ACTION: IMMEDIATELY invoke the 'enviar_resumo_pedido' tool.
-                After using the tool, state strictly: "Mandei o resumo do pedido aí em cima! Está tudo certinho? Posso mandar para a cozinha?"
-         """
-    elif status_pedido == "AGUARDANDO_CONFIRMACAO":
-        trava_seguranca = """
-                🚨 MODO AGUARDAR CONFIRMAÇÃO ATIVADO 🚨
-                    The order summary has already been sent. You are now just waiting for the customer's final approval.
-
-                    ACTION RULES BASED ON THE CUSTOMER'S RESPONSE:
-                    
-                    1. IF THE CUSTOMER CONFIRMS (e.g., "Yes", "Go ahead", "Everything is correct", "Ok"):
-                       - YOUR ONLY ACTION: IMMEDIATELY invoke the 'lancar_pedido_sistema' tool.
-                       - After the tool returns success, thank the customer, inform them that the order is being prepared in the kitchen, and say goodbye cordially.
-                    
-                    2. IF THE CUSTOMER WANTS TO CHANGE SOMETHING (e.g., "I forgot to ask for change", "Add a Coke", "Change the address"):
-                       - Act normally to resolve the issue. Invoke the 'gerenciar_carrinho' tool if it involves items, or simply confirm the new delivery/payment details.
-                       - Then, inform them that the change has been made.
-                    
-                    ABSOLUTE PROHIBITIONS AT THIS STAGE:
-                    - FORBIDDEN to invoke 'enviar_resumo_pedido' repeatedly, unless the customer makes a major change and explicitly asks for a new summary.
-                    - FORBIDDEN to offer new items from the menu.
-                """
-    else:
-        trava_seguranca = """
-            ✅ MODO ATENDIMENTO ATIVADO
-                The order is still being assembled.
-                Act as a helpful waiter. Present the menu and add items using the 'gerenciar_carrinho' tool.
-                When the customer says they have finished choosing, ask if it is for Delivery or Pickup, as well as the address and payment method.
-            """
-
-    if not status_loja["aberto"]:
-        contexto_horario = "WE ARE CLOSED AT THE MOMENT. Do not accept orders."
-    else:
-        contexto_horario = f"We are open for the: {status_loja['turno'].upper()} shift. This means you must focus on the {status_loja['turno']} menu."
-
-    prompt = ChatPromptTemplate.from_messages([
-        ("system",
-         f"""You are the virtual assistant for the diner {tenant.nome_fantasia}. 
-            Store ID: '{tenant.id}' | Customer: {chat_id}.
-            CURRENT STATUS: {contexto_horario} | SHIFT: {status_loja['turno']}
-
-            CRITICAL RULE: You must always communicate with the customer in Brazilian Portuguese (pt-BR). Respond naturally, quickly, and in short messages.
-            
-            ## 🛒 ACTUAL ORDER STATUS (OFFICIAL SYSTEM)
-            - Current items: {texto_itens}
-            - Order stage: {status_pedido}
 
             {trava_seguranca}
 
@@ -120,13 +55,93 @@ def build_prompts(tenant: Tenant, status_loja: dict, chat_id, carrinho: dict):
                     - The payment method (Pix, Credit Card, or Cash), including whether they need change if paying with cash.
                 2. AS SOON AS THE CUSTOMER PROVIDES THESE DETAILS: You MUST invoke the 'gerenciar_carrinho' tool using the 'checkout' action to save the delivery and payment information.
                 3. Once the tool confirms that the data has been saved, inform the customer that you are generating the order summary. 
-            """
+                
+            Store ID: '{id_loja}' | Customer: {chat_id}.
+            CURRENT STATUS: {contexto_horario} | SHIFT: {turno}
 
-         ),
-        MessagesPlaceholder(variable_name="history", n_messages=5),
+            CRITICAL RULE: You must always communicate with the customer in Brazilian Portuguese (pt-BR). Respond naturally, quickly, and in short messages.
+            
+            ## 🛒 ACTUAL ORDER STATUS (OFFICIAL SYSTEM)
+            - Current items: {texto_itens}
+            - Order stage: {status_pedido}
+            """
+         )
+
+def build_prompts(tenant: Tenant, status_loja: dict, chat_id, carrinho: dict):
+
+    model = "gpt-5.4-mini-2026-03-17"
+
+    llm = ChatOpenAI(
+        model=model,
+        temperature=0.4,
+        api_key=settings.OPENAI_API_KEY
+    )
+
+    status_pedido = carrinho.get("status")
+    lista_itens = carrinho.get("itens", [])
+
+
+    texto_itens = ", ".join([f"{i['qty']}x {i['nome']}" for i in lista_itens]) if lista_itens else "Vazio"
+
+    if status_pedido == "PRONTO_PARA_RESUMO":
+        trava_seguranca = wrap.dedent("""\
+            🚨 MODO RESTRITO ATIVADO 🚨
+                The customer has already chosen the items and provided delivery/payment details.
+                YOU ARE FORBIDDEN FROM ASKING NEW QUESTIONS OR OFFERING THE MENU.
+                YOUR ONLY PERMITTED ACTION: IMMEDIATELY invoke the 'enviar_resumo_pedido' tool.
+                After using the tool, state strictly: "Mandei o resumo do pedido aí em cima! Está tudo certinho? Posso mandar para a cozinha?"
+         """
+        )
+    elif status_pedido == "AGUARDANDO_CONFIRMACAO":
+        trava_seguranca = wrap.dedent("""\
+                🚨 MODO AGUARDAR CONFIRMAÇÃO ATIVADO 🚨
+                    The order summary has already been sent. You are now just waiting for the customer's final approval.
+
+                    ACTION RULES BASED ON THE CUSTOMER'S RESPONSE:
+                    
+                    1. IF THE CUSTOMER CONFIRMS (e.g., "Yes", "Go ahead", "Everything is correct", "Ok"):
+                       - YOUR ONLY ACTION: IMMEDIATELY invoke the 'lancar_pedido_sistema' tool.
+                       - After the tool returns success, thank the customer, inform them that the order is being prepared in the kitchen, and say goodbye cordially.
+                    
+                    2. IF THE CUSTOMER WANTS TO CHANGE SOMETHING (e.g., "I forgot to ask for change", "Add a Coke", "Change the address"):
+                       - Act normally to resolve the issue. Invoke the 'gerenciar_carrinho' tool if it involves items, or simply confirm the new delivery/payment details.
+                       - Then, inform them that the change has been made.
+                    
+                    ABSOLUTE PROHIBITIONS AT THIS STAGE:
+                    - FORBIDDEN to invoke 'enviar_resumo_pedido' repeatedly, unless the customer makes a major change and explicitly asks for a new summary.
+                    - FORBIDDEN to offer new items from the menu.
+                """
+        )
+    else:
+        trava_seguranca = wrap.dedent("""\
+            ✅ MODO ATENDIMENTO ATIVADO
+                The order is still being assembled.
+                Act as a helpful waiter. Present the menu and add items using the 'gerenciar_carrinho' tool.
+                When the customer says they have finished choosing, ask if it is for Delivery or Pickup, as well as the address and payment method.
+            """)
+
+    if not status_loja["aberto"]:
+        contexto_horario = "WE ARE CLOSED AT THE MOMENT. Do not accept orders."
+    else:
+        contexto_horario = f"We are open for the: {status_loja['turno'].upper()} shift. This means you must focus on the {status_loja['turno']} menu."
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_template),
+        MessagesPlaceholder(variable_name="history"),
         ("human", "{input}"),
         MessagesPlaceholder(variable_name="agent_scratchpad"),
     ])
+    
+    prompt = prompt.partial(
+        nome_loja=tenant.nome_fantasia,
+        id_loja=tenant.id,
+        chat_id=chat_id,
+        contexto_horario=contexto_horario,
+        turno=status_loja['turno'],
+        texto_itens=texto_itens,
+        status_pedido=status_pedido,
+        trava_seguranca=trava_seguranca
+    )
 
     tools = [
         consultar_cardapio,
@@ -145,8 +160,7 @@ def build_prompts(tenant: Tenant, status_loja: dict, chat_id, carrinho: dict):
         handle_parsing_errors=True
     )
 
-    def get_session_history(session_id: str):
-        return RedisChatMessageHistory(session_id, url=settings.REDIS_URL)
+
 
     chain_with_history = RunnableWithMessageHistory(
         agent_executor,
@@ -161,4 +175,4 @@ def build_prompts(tenant: Tenant, status_loja: dict, chat_id, carrinho: dict):
         "model": model,
         "get_session_history": get_session_history,
     }
-
+    

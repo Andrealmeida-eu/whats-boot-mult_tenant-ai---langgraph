@@ -8,7 +8,7 @@ import json
 import asyncio
 from fast_api.core.database.model.base_tenant.horarioFuncionamento import HorarioFuncionamento, TurnoCardapio
 from fast_api.redis.cart import add_item_to_cart_state, get_cart_state, remove_item_from_cart_state, clear_cart_state, \
-    set_item_quantity_state
+    set_item_quantity_state, atualizar_status_cart_state,buscar_resumo_carrinho_redis,buscar_resumo_carrinho_full_redis
 from fast_api.routes.api_restaurant.funcionamento import verificar_status_e_turno
 from fast_api.core.database.conection.conection_orm import get_db
 from fast_api.core.database.model.restaurant.orders import Pedido, ItemPedido, StatusPedido
@@ -18,72 +18,14 @@ from fast_api.core.database.model.base_tenant.tenantBase import Tenant
 from providers.factory import get_provider
 
 
-# ==========================================
-# 1. SCHEMAS (PYDANTIC) DAS FERRAMENTAS
-# ==========================================
-
-class TenantInput(BaseModel):
-    tenant_id: str = Field(description="O ID da lanchonete (tenant). Ex: 'burger-do-japa'")
-
-
-class ClienteTenantInput(BaseModel):
-    tenant_id: str = Field(description="O ID da lanchonete")
-    whatsapp_cliente: str = Field(description="O número do WhatsApp do cliente")
-
-
-class ItemPedidoIA(BaseModel):
-    nome_produto: str = Field(description="Nome do produto conforme cardápio")
-    quantidade: int = Field(description="Quantidade solicitada")
-
-
-class LancarPedidoInput(BaseModel):
-    tenant_id: str = Field(description="O ID da lanchonete")
-    whatsapp_cliente: str = Field(description="O número do WhatsApp do cliente")
-    nome_cliente: str = Field(description="O nome do cliente")
-    itens: List[ItemPedidoIA] = Field(description="Lista contendo os lanches e bebidas escolhidos")
-    tipo_entrega: str = Field(description="'DELIVERY' ou 'BALCAO'")
-    forma_pagamento: str = Field(description="PIX, DINHEIRO, ou CARTAO")
-    endereco_entrega: Optional[str] = Field(None, description="Endereço completo da entrega. Vazio se BALCAO.")
-    troco_para: Optional[float] = Field(None, description="Se for dinheiro, informe para quanto é o troco. Ex: 50.0")
-
-class CardapioInput(BaseModel):
-    tenant_id: str = Field(..., description="O ID da loja")
-    turno_especifico: Optional[str] = Field(
-        None,
-        description="OPCIONAL. Use 'dia' ou 'noite' APENAS se o cliente perguntar sobre itens de outro horário."
-    )
-    termo_busca: Optional[str] = Field(
-        default=None,
-        description="Nome da categoria que o cliente escolheu. Deixe vazio se quiser listar os nomes das categorias"
-    )
-
-class CarrinhoInput(BaseModel):
-    tenant_id: str = Field(description="O ID da loja")
-    categoria_escolhida: str = Field(description="Categoria do produto escolhido")
-    itens: ItemPedidoIA = Field(description="lanche(s) e bebida(s) escolhidos")
-
-class CartInput(BaseModel):
-    tenant_id: str = Field (description="O ID da lanchonete")
-    chat_id: str = Field(description="O ID da conversa")
-    produto_nome: Optional[str] = Field(None, description="Nome do produto")
-    produto_preco: Optional[float] = Field(None, description="Preço do produto")
-    qty: Optional[int] = Field(None, description="quantidade de itens")
-
-
-class AcaoCarrinhoInput(BaseModel):
-    tenant_id: str
-    chat_id: str
-    acao: str = Field(description="'adicionar', 'remover', 'alterar', 'consultar' ou 'limpar'")
-    produto_nome: Optional[str] = Field(None, description="Nome do produto")
-    itens: Optional[List[ItemPedidoIA]] = Field(None, description="Lista de itens, se aplicável")
-    qty: Optional[int] = Field(None, description="quantidade de itens")
-
 
 
 # ==========================================
 # 2. FERRAMENTAS (TOOLS) PARA O AGENTE
 # ==========================================
 
+def log(*args):
+    print("[TOOLS]", *args, flush=True)
 
 def consultar_preco_produto_state(
         tenant_id: str,
@@ -264,108 +206,115 @@ def consultar_status_pedido_state(tenant_id: str, whatsapp_cliente: str) -> str:
 async def lancar_pedido_sistema_state(
         tenant_id: str,
         chat_id: str,
-        tipo_entrega: str,
-        forma_pagamento: str,
-        endereco_entrega: str = None,
-        troco_para: float = None
 ) -> str:
     """
     Use ONLY at the end of the service, after sending the summary and the customer says "Sim, pode confirmar".
     Saves the official order in the diner's system.
     """
-    async with contextmanager(get_db)() as db:
-        try:
+ 
+    db = next(get_db())
+    try:
 
-            cart = await get_cart_state(tenant_id, chat_id)
+        cart = await buscar_resumo_carrinho_full_redis(tenant_id, chat_id)
 
-            if not cart or cart == "{}":
-                return "❌ ALERTA PARA A IA: O carrinho está vazio! O pedido NÃO foi gerado. Avise o cliente."
+        if not cart or cart == "{}":
+            return "❌ ALERTA PARA A IA: O carrinho está vazio! O pedido NÃO foi gerado. Avise o cliente."
 
-            cart_dict = json.loads(cart) if isinstance(cart, str) else cart
+        cart_dict = json.loads(cart) if isinstance(cart, str) else cart
+            
+        tipo_entrega = cart_dict.get("tipo_entrega")
+        forma_pagamento = cart_dict.get("forma_pagamento")
+        endereco_entrega = cart_dict.get("endereco_entrega")
+        troco_para = cart_dict.get("troco_para")
+        log(f"cart resumo full: tipo entrega {tipo_entrega}, forma pagamento: {forma_pagamento}, endereco: {endereco_entrega}, troco: {troco_para}")
+        cliente = db.query(Cliente).filter(
+            Cliente.whatsapp_id == chat_id,
+            Cliente.tenant_id == tenant_id
+        ).first()
 
-            cliente = db.query(Cliente).filter(
-                Cliente.whatsapp_id == chat_id,
-                Cliente.tenant_id == tenant_id
-            ).first()
-
-            if not cliente:
-                cliente = Cliente(
-                    tenant_id=tenant_id,
-                    endereco_padrao=endereco_entrega
-                )
-                db.add(cliente)
-                db.flush()
-
-
-            novo_pedido = Pedido(
+        if not cliente:
+            cliente = Cliente(
                 tenant_id=tenant_id,
-                cliente_id=cliente.id,
-                status=StatusPedido.PENDENTE,
-                tipo_entrega=tipo_entrega.upper(),
-                forma_pagamento=forma_pagamento.upper(),
-                endereco_entrega=endereco_entrega,
-                troco_para=troco_para,
-                valor_total=0.0
+                endereco_padrao=endereco_entrega
             )
-            db.add(novo_pedido)
+            db.add(cliente)
             db.flush()
 
-            valor_total = 0.0
+
+        novo_pedido = Pedido(
+            tenant_id=tenant_id,
+            cliente_id=cliente.id,
+            status=StatusPedido.PENDENTE,
+            tipo_entrega=tipo_entrega.upper() if tipo_entrega else "",
+            forma_pagamento=forma_pagamento.upper() if forma_pagamento else "",
+            endereco_entrega=endereco_entrega,
+            troco_para=troco_para,
+            valor_total=0.0
+            )
+        db.add(novo_pedido)
+        db.flush()
+
+        valor_total = 0.0
+
+        itens_carrinho = cart_dict.get("itens", [])
+
+        for item in itens_carrinho:
+            nome_prod = item.get("nome")
+            qtd_prod = int(item.get('qty', 1))
 
 
-            for nome_prod, dados in cart_dict.items():
+            produto = db.query(Produto).filter(
+                Produto.nome == nome_prod,
+                Produto.tenant_id == tenant_id
+            ).first()
 
-                qtd_prod = int(dados['qty'])
+            if not produto:
+                db.rollback()
+                return f"Erro: Produto '{nome_prod}' não encontrado no banco. Peça para o cliente refazer a escolha."
 
-
-                produto = db.query(Produto).filter(
-                    Produto.nome == nome_prod,
-                    Produto.tenant_id == tenant_id
-                ).first()
-
-                if not produto:
-                    db.rollback()
-                    return f"Erro: Produto '{nome_prod}' não encontrado no banco. Peça para o cliente refazer a escolha."
-
-                novo_item = ItemPedido(
-                    tenant_id=tenant_id,
-                    pedido_id=novo_pedido.id,
-                    produto_id=produto.id,
-                    quantidade=qtd_prod,
-                    preco_unitario=produto.preco
-                )
-                db.add(novo_item)
-                valor_total += (produto.preco * qtd_prod)
+            novo_item = ItemPedido(
+                tenant_id=tenant_id,
+                pedido_id=novo_pedido.id,
+                produto_id=produto.id,
+                quantidade=qtd_prod,
+                preco_unitario=produto.preco
+            )
+            db.add(novo_item)
+            valor_total += (produto.preco * qtd_prod)
 
 
-            if tipo_entrega.upper() == "DELIVERY":
-                tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
-                if tenant and tenant.taxa_entrega_padrao:
-                    valor_total += tenant.taxa_entrega_padrao
+        if tipo_entrega.upper() == "DELIVERY":
+            tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+            if tenant and tenant.taxa_entrega_padrao:
+                valor_total += tenant.taxa_entrega_padrao
 
-            novo_pedido.valor_total = valor_total
-            db.commit()
+        novo_pedido.valor_total = valor_total
+        db.commit()
 
-            await clear_cart_state(tenant_id, chat_id)
+        await clear_cart_state(tenant_id, chat_id)
 
-            return f"Sucesso! Pedido #{novo_pedido.id} gerado na cozinha. Valor total (com taxa, se houver): R$ {valor_total:.2f}."
+        return f"Sucesso! Pedido #{novo_pedido.id} gerado na cozinha. Valor total (com taxa, se houver): R$ {valor_total:.2f}."
 
-        except Exception as e:
-            db.rollback()
-            return f"Erro interno ao salvar o pedido: {str(e)}"
-
-
+    except Exception as e:
+        db.rollback()
+        return f"Erro interno ao salvar o pedido: {str(e)}"
+    finally:
+        db.close()
+        
+        
 async def enviar_resumo_pedido_state(
         tenant_id: str,
         chat_id: str
 ) -> str:
     with contextmanager(get_db)() as db:
         try:
-            cart = await get_cart_state(tenant_id, chat_id)
+            
+            cart = await buscar_resumo_carrinho_redis(tenant_id, chat_id)
             taxa_entrega = 5.00
 
             cart_dict = json.loads(cart) if isinstance(cart, str) else cart
 
+            log(f" peguei o carrinho --> {cart_dict}")
             subtotal = 0.0
 
             # 1. Cabeçalho do Recibo
@@ -375,10 +324,13 @@ async def enviar_resumo_pedido_state(
                 "--------------------------------------\n"
             )
 
+            log(f"type(cart_dict)={type(cart_dict)} valor={cart_dict}")
+            
             # 2. Loop para preencher os itens
-            for nome, dados in cart_dict.items():
-                preco_item = float(dados['preco'])
-                qtd_item = int(dados['qty'])
+            for item in cart_dict["itens"]:
+                nome = item["nome"]
+                qtd_item = int(item["qty"])
+                preco_item = float(item['preco'])
                 valor_linha = preco_item * qtd_item
                 subtotal += valor_linha
 
@@ -408,12 +360,19 @@ async def enviar_resumo_pedido_state(
             tenant = db.query(Tenant).filter(
                 Tenant.id == tenant_id
             ).first()
+            
+            log(f" peguei o tenant --> {tenant.id}")
 
             provider = get_provider(tenant)
-
+            log(f" peguei o provider --> {provider.api_url}")
+            
             await asyncio.to_thread(provider.send_text, chat_id, texto_recibo)
-
-            await update_cart_status(tenant_id, chat_id, "AGUARDANDO_CONFIRMACAO")
+            log(f" enviei texto")
+            await atualizar_status_cart_state(tenant_id, chat_id, "AGUARDANDO_CONFIRMACAO")
+            log(f" atualizei")
+            return (
+                    "SYSTEM: The receipt has been successfully sent via API.\n"
+                )
         except Exception as e:
             return f"Erro interno ao enviar o resumo: {str(e)}"
 

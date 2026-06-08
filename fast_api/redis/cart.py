@@ -1,6 +1,6 @@
 
 import redis.asyncio as redis
-from rich import json
+import json
 
 from fast_api.core.config.configapi import settings
 from fast_api.core.database.conection.conection_orm import get_db
@@ -145,7 +145,8 @@ async def clear_cart_state(
 async def atualizar_dados_checkout(
         tenant_id: str,
         chat_id: str,
-        tipo_entrega: str,  # Ex: "Delivery" ou "Retirada"
+        tipo_entrega: str,
+        troco_para:str, 
         endereco: str,
         forma_pagamento: str  # Ex: "Pix", "Cartão", "Dinheiro"
 ):
@@ -154,26 +155,34 @@ async def atualizar_dados_checkout(
     """
     key = cart_key(tenant_id, chat_id)
 
+    log(type(troco_para))
+    troco = float(troco_para)
+    log(f"----> no if {type(troco)}")
+    
     existe = await client.exists(key)
+    
     if not existe:
         return "❌ ERRO: Carrinho vazio. Peça para o cliente escolher os itens primeiro."
 
     await client.hset(key, "tipo_entrega", tipo_entrega)
+
     await client.hset(key, "endereco", endereco)
     await client.hset(key, "forma_pagamento", forma_pagamento)
 
     await client.hset(key, "status", "PRONTO_PARA_RESUMO")
+    await client.hset(key, "troco_para", troco)
+    
     await client.expire(key, CART_TTL)
 
     return "Dados de checkout salvos com sucesso! Agora você DEVE acionar a ferramenta 'enviar_resumo_pedido' IMEDIATAMENTE."
 
 
 async def buscar_resumo_carrinho_redis(tenant_id: str, chat_id: str) -> dict:
-    key = f"carrinho:{tenant_id}:{chat_id}"
-
+    key = cart_key(tenant_id, chat_id)
     # Busca todos os campos do Hash de forma assíncrona com await
     carrinho_cru = await client.hgetall(key)
-
+    log(carrinho_cru)
+    
     if not carrinho_cru:
         return {"status": "MONTANDO_PEDIDO", "itens": []}
 
@@ -194,7 +203,8 @@ async def buscar_resumo_carrinho_redis(tenant_id: str, chat_id: str) -> dict:
                 dados_item = json.loads(valor)
                 itens.append({
                     "nome": campo,
-                    "qty": dados_item.get("qty", 1)
+                    "qty": dados_item.get("qty", 1),
+                    "preco": dados_item.get("preco", 0.0)
                 })
             except Exception as e:
                 log(str(e))
@@ -210,20 +220,69 @@ async def atualizar_status_cart_state(
         chat_id:str,
         novo_status:str
 ):
-    key = f"carrinho:{tenant_id}:{chat_id}"
+    log(f" cheguei ---> {tenant_id},{chat_id};{novo_status}")
+    key = cart_key(tenant_id, chat_id)
 
-    cart_data = await client.get(key)
+    log(f"cartkey -->  {key}")
+    existe = await client.exists(key)
 
-    if cart_data:
-        cart_dict = json.loads(cart_data)
-
-        cart_dict["status"] = novo_status
-
-        await client.set(key, json.dumps(cart_dict))
+    if existe:
+        await client.hset(key, "status", novo_status)
+        log(f"setei (atualizei o status no Hash)")
     else:
         # Se por acaso o carrinho não existir, cria um do zero com o novo status
         novo_carrinho = {
             "status": novo_status,
-            "itens": []
+            "itens": json.dumps([])
         }
-        await client.set(key, json.dumps(novo_carrinho))
+        log(f"setarei ----> {novo_carrinho}")
+        await client.hset(key, mapping=novo_carrinho)
+        log(f"setei else")
+        
+async def buscar_resumo_carrinho_full_redis(tenant_id: str, chat_id: str) -> dict:
+    key = cart_key(tenant_id, chat_id)
+    carrinho_cru = await client.hgetall(key)
+    log(carrinho_cru)
+    
+    # Já cria um dicionário padrão com campos vazios para evitar erros nos gets
+    resultado = {
+        "status": "MONTANDO_PEDIDO",
+        "itens": [],
+        "tipo_entrega": None,
+        "forma_pagamento": None,
+        "endereco_entrega": None,
+        "troco_para": None
+    }
+
+    if not carrinho_cru:
+        return resultado
+
+    for campo_bytes, valor_bytes in carrinho_cru.items():
+        campo = campo_bytes.decode('utf-8') if isinstance(campo_bytes, bytes) else campo_bytes
+        valor = valor_bytes.decode('utf-8') if isinstance(valor_bytes, bytes) else valor_bytes
+
+        # Associa os campos conhecidos às chaves do nosso resultado
+        if campo == "status":
+            resultado["status"] = valor
+        elif campo == "tipo_entrega":
+            resultado["tipo_entrega"] = valor
+        elif campo == "forma_pagamento":
+            resultado["forma_pagamento"] = valor
+        elif campo in ["endereco_entrega", "endereco"]: # Trata as duas variações de nome
+            resultado["endereco_entrega"] = valor
+        elif campo == "troco_para":
+            resultado["troco_para"] = valor
+        else:
+            # Se não é nenhum dos campos acima, assumimos que é um produto cadastrado pelo hset
+            try:
+                dados_item = json.loads(valor)
+                resultado["itens"].append({
+                    "nome": campo,
+                    "qty": dados_item.get("qty", 1),
+                    "preco": dados_item.get("preco", 0.0)
+                })
+            except Exception as e:
+                log(f"Erro ao processar item do carrinho: {str(e)}")
+                continue
+
+    return resultado

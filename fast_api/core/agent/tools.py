@@ -11,67 +11,41 @@ from fast_api.utils.service_tool import lancar_pedido_sistema_state, consultar_s
 # ==========================================
 # 1. SCHEMAS (PYDANTIC) DAS FERRAMENTAS
 # ==========================================
-class TenantInput(BaseModel):
-    tenant_id: str = Field(description="The ID of the diner (tenant). E.g., 'burger-do-japa'")
-
-
 class ClienteTenantInput(BaseModel):
-    tenant_id: str = Field(description="The ID of the diner")
-    whatsapp_cliente: str = Field(description="The customer's WhatsApp number")
-
+    tenant_id: str = Field(description="Tenant ID")
+    whatsapp_cliente: str = Field(description="Customer WhatsApp")
 
 class ItemPedidoIA(BaseModel):
-    nome_produto: str = Field(description="Name of the product as per the menu")
-    quantidade: int = Field(description="Requested quantity")
-
+    nome_produto: str = Field(description="Product name")
+    quantidade: int = Field(description="Quantity")
 
 class LancarPedidoInput(BaseModel):
-    tenant_id: str = Field(description="The ID of the diner")
-    chat_id: str = Field(description="The ID of the conversation")
-    tipo_entrega: str = Field(description="'DELIVERY' or 'BALCAO' (pickup)")
-    forma_pagamento: str = Field(description="PIX, DINHEIRO (cash), or CARTAO (card)")
-    endereco_entrega: Optional[str] = Field(None, description="Full delivery address. Empty if BALCAO.")
-    troco_para: Optional[float] = Field(None,
-                                        description="If paying in cash, specify the amount for change. E.g., 50.0")
-
-    itens: List[ItemPedidoIA] = Field(description="MANDATORY list containing the items the customer chose.")
+    tenant_id: str = Field(description="Tenant ID")
+    chat_id: str = Field(description="Chat ID")
 
 class CardapioInput(BaseModel):
-    tenant_id: str = Field(..., description="The ID of the store")
-    turno_especifico: Optional[str] = Field(
-        None,
-        description="OPTIONAL. Use 'dia' (day) or 'noite' (night) ONLY if the customer asks about items from a different shift."
-    )
-    termo_busca: Optional[str] = Field(
-        default=None,
-        description="Name of the category the customer chose. Leave empty if you want to list the category names"
-    )
-
-class CarrinhoInput(BaseModel):
-    tenant_id: str = Field(description="The ID of the store")
-    categoria_escolhida: str = Field(description="Category of the chosen product")
-    itens: ItemPedidoIA = Field(description="Chosen snack(s) and drink(s)")
+    tenant_id: str = Field(..., description="Tenant ID")
+    turno_especifico: Optional[str] = Field(None, description="Optional: 'dia' or 'noite'.")
+    termo_busca: Optional[str] = Field(default=None, description="Category name, or empty to list main categories.")
 
 class CartInput(BaseModel):
-    tenant_id: str = Field (description="The ID of the diner")
-    chat_id: str = Field(description="The ID of the conversation")
-    produto_nome: Optional[str] = Field(None, description="Name of the product")
-    produto_preco: Optional[float] = Field(None, description="Price of the product")
-    qty: Optional[int] = Field(None, description="Quantity of items")
-
+    tenant_id: str = Field(description="Tenant ID")
+    chat_id: str = Field(description="Chat ID")
+    produto_nome: Optional[str] = Field(None, description="Product name")
+    produto_preco: Optional[float] = Field(None, description="Product price")
+    qty: Optional[int] = Field(None, description="Quantity")
 
 class AcaoCarrinhoInput(BaseModel):
     tenant_id: str
     chat_id: str
     acao: str = Field(description="'adicionar', 'remover', 'alterar', 'consultar', 'checkout' or 'limpar'")
-    produto_nome: Optional[str] = Field(None, description="Name of the product")
-    itens: Optional[List[ItemPedidoIA]] = Field(None, description="List of items, if applicable")
-    qty: Optional[int] = Field(None, description="Quantity of items")
-    tipo_entrega: str = Field(description="'DELIVERY' or 'BALCAO' (pickup)")
-    forma_pagamento: str = Field(description="PIX, DINHEIRO (cash), or CARTAO (card)")
-    endereco_entrega: Optional[str] = Field(None, description="Full delivery address. Empty if BALCAO.")
-    troco_para: Optional[float] = Field(None,
-                                        description="If paying in cash, specify the amount for change. E.g., 50.0")
+    produto_nome: Optional[str] = Field(None, description="Product name")
+    itens: Optional[List[ItemPedidoIA]] = Field(None, description="List of items")
+    qty: Optional[int] = Field(None, description="Quantity")
+    tipo_entrega: str = Field(description="'DELIVERY' or 'BALCAO'")
+    forma_pagamento: str = Field(description="'PIX', 'DINHEIRO', or 'CARTAO'")
+    endereco: Optional[str] = Field(None, description="Delivery address. Empty if BALCAO.")
+    troco_para: Optional[str] = Field("0.0", description="Change for cash payment. E.g., '50.0'")
 # ==========================================
 # 2. FERRAMENTAS (TOOLS) PARA O AGENTE
 # ==========================================
@@ -83,9 +57,7 @@ def consultar_preco_produto(
         **kwargs
 ) -> Any:
 
-    """
-       ALWAYS use after the customer asks to add an item and this item does not have a price.
-    """
+    """Gets item price if missing."""
     preco_produto = consultar_preco_produto_state(
         tenant_id,
         produto_nome
@@ -99,11 +71,7 @@ def consultar_cardapio(
         turno_especifico: str,
         termo_busca: str
 ) -> Any:
-    """
-        ALWAYS use whenever the customer asks to see the menu.
-        If no search term is passed, it lists the Main Categories.
-        If the search term is a category (e.g., "Bebidas"), it returns the products separated by sub-types.
-   """
+    """Gets menu. Leave termo_busca empty for categories, or pass category name for items."""
     consulta_cardapio = consultar_cardapio_state(
             tenant_id,
             turno_especifico,
@@ -116,9 +84,7 @@ def consultar_cardapio(
 
 @tool(args_schema=ClienteTenantInput)
 def consultar_status_pedido(tenant_id: str, whatsapp_cliente: str) -> str:
-    """
-   Use when the customer asks "Cadê meu lanche?", "Já saiu para entrega?", or "Qual o status do meu pedido?".
-    """
+    """Gets order status for the customer."""
 
     consultar_status = consultar_status_pedido_state(
                                         tenant_id,
@@ -131,23 +97,15 @@ def consultar_status_pedido(tenant_id: str, whatsapp_cliente: str) -> str:
 
 @tool(args_schema=LancarPedidoInput)
 async def lancar_pedido_sistema(
-        tenant_id: str,chat_id: str,
-        tipo_entrega: str, forma_pagamento: str, endereco_entrega: str = None, troco_para: float = None
+        tenant_id: str,chat_id: str
 ) -> str:
-    """
-    Use ONLY at the end of the service, after sending the summary and the customer says "Sim, pode confirmar".
-    Saves the official order in the diner's system.
-    """
+    """Saves official order after customer confirmation."""
 
 
 
     lancar_pedido_call = await lancar_pedido_sistema_state(
                     tenant_id,
-                    chat_id,
-                    tipo_entrega,
-                    forma_pagamento,
-                    endereco_entrega,
-                    troco_para
+                    chat_id
     )
 
     return lancar_pedido_call
@@ -157,17 +115,13 @@ async def enviar_resumo_pedido(
         tenant_id: str,
         chat_id: str
 ) -> str:
-    """
-    Used when the customer has finished ordering, to generate the order summary.
-    """
-    await enviar_resumo_pedido_state(
+    """Generates order summary before final confirmation."""
+    resumo = await enviar_resumo_pedido_state(
         tenant_id,
         chat_id
     )
 
-    return (
-        "SYSTEM: The receipt has been successfully sent via API.\n"
-    )
+    return resumo
 
 
 
@@ -183,6 +137,7 @@ async def gerenciar_carrinho(
         qty: int,
         tipo_entrega: str,
         endereco: str,
+        troco_para: str,
         forma_pagamento: str,
         itens: list = None) -> str:
     """A single tool to manage the customer's shopping cart."""
@@ -196,10 +151,12 @@ async def gerenciar_carrinho(
         return "Carrinho limpo."
 
     elif acao == "checkout":
+ 
         checkout = await atualizar_dados_checkout(
             tenant_id,
             chat_id,
             tipo_entrega,
+            troco_para,
             endereco,
             forma_pagamento
         )
@@ -233,6 +190,7 @@ async def gerenciar_carrinho(
             quantidade = qty if qty is not None else 1
             res = await add_item_to_cart_state(tenant_id, chat_id, produto_nome, quantidade)
             resultados.append(res)
+            return res
 
         else:
             return "❌ ALERTA: Você tentou adicionar um item, mas não enviou nem a lista 'itens' nem o 'produto_nome'. Tente novamente."

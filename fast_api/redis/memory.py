@@ -5,20 +5,38 @@ from langchain_community.chat_message_histories import RedisChatMessageHistory
 # -> URL de conexão com Redis (vem do .env)
 from fast_api.core.config.configapi import settings
 
+class trimedRedisHistory(RedisChatMessageHistory):
+    def __init__(
+        self, 
+        session_id:str,
+        url:str,
+        key_prefix:str,
+        ttl: int,
+        max_messages: int
+        ):
+        
+        super().__init__(
+            session_id = session_id,
+            url=url,
+            key_prefix=key_prefix,
+            ttl=ttl,
+            )
+        
+        self.max_messages = max_messages
+        
+    @property
+    def messages(self):
+        
+        all_messages = super().messages
+        
+        return all_messages[-self.max_messages:] if all_messages else []
 
 def get_session_history(session_id):
-    # -> Retorna um objeto de histórico de conversa ligado a uma sessão específica
-    #
-    # -> session_id normalmente é algo como:
-    # -> "tenant_id:chat_id"
-    #
-    # -> Isso garante que:
-    # -> - cada conversa tem seu próprio histórico
-    # -> - o histórico persiste entre mensagens
-    # -> - se o processo reiniciar, o histórico não se perde (Redis)
-    return RedisChatMessageHistory(
-        session_id=session_id,  # -> chave única da conversa
-        url=settings.REDIS_URL,# -> conexão com o Redis
+
+    return trimedRedisHistory(
+        session_id=session_id,
+        url=settings.REDIS_URL,
         key_prefix="lc_history",
-        ttl=3600
+        ttl=3600,
+        max_messages=6
     )

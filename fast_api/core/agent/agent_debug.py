@@ -12,6 +12,9 @@ from fast_api.routes.api_restaurant.gestao_ia import salvar_dados_interacao, Ges
 client = OpenAI()
 fuso_sp = ZoneInfo("America/Sao_Paulo")
 
+def log(*args):
+    print("[AGENT-DEBUG]", *args, flush=True)
+    
 def to_openai_messages(messages):
     role_map = {
         "human": "user",
@@ -74,7 +77,7 @@ async def invoke_with_debug(
                 }
             },
         )
-
+        log(f"tokens de entrada --> {cb.prompt_tokens}, tokens saida --> {cb.completion_tokens}, total: {cb.total_tokens}, custo: {cb.total_cost}")
         dados_consumo = GestaoCreate(
             tokens_entrada=cb.prompt_tokens,
             tokens_saida=cb.completion_tokens,
