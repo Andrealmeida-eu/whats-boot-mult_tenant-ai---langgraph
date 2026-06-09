@@ -1,6 +1,6 @@
 from fastapi import Depends, Header, HTTPException
 from fastapi.security import OAuth2PasswordBearer
-import  jwt
+import jwt
 from sqlalchemy.orm import Session
 
 from fast_api.core.database.model.restaurant.auth import Usuario, Role

@@ -66,7 +66,7 @@ async def webhook_evolution(
 ):
     # -> Lê o JSON da requisição (payload enviado pela Evolution).
     payload = await request.json()
-
+    print(f"cheguei no webhook = {payload}")
     tenant_id = payload.get("instance")
     tenant_db = (
         db.query(TenantModel)

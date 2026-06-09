@@ -96,7 +96,7 @@ def consultar_cardapio_state(
             tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
             taxa = tenant.taxa_entrega_padrao if tenant and tenant.taxa_entrega_padrao else 0.0
 
-
+            
             if not turno_especifico:
                 status_atual = verificar_status_e_turno(tenant_id, db)
                 turno_pesquisa = status_atual["turno"] if status_atual["aberto"] else None
@@ -104,6 +104,7 @@ def consultar_cardapio_state(
                 turno_pesquisa = turno_especifico
 
             turno_atual = turno_pesquisa
+            log(turno_atual)
 
             produtos = db.query(Produto).filter(
                 Produto.tenant_id == tenant_id,
@@ -126,11 +127,12 @@ def consultar_cardapio_state(
                     ]
                 )
 
-                resposta_texto = f"Taxa de Entrega: R$ {taxa:.2f}\nCategorias Disponíveis:\n"
+                # Formatação direta e amigável para o cliente final
+                resposta_texto = f"🛵 *Taxa de Entrega:* R$ {taxa:.2f}\n\n*Veja nossas categorias:*\n"
                 for cat in categorias:
-                    resposta_texto += f"- {cat}\n"
+                    resposta_texto += f"🔸 {cat}\n"
 
-                resposta_texto += "\nINSTRUÇÃO INTERNA: Mostre apenas os nomes dessas categorias ao cliente e pergunte qual ele deseja ver."
+                resposta_texto += "\nQual dessas você deseja olhar? Digite o nome."
                 return resposta_texto
             termo_busca_normalize = termo_busca.lower().strip()
             produtos_filtrados = [p for p in produtos if

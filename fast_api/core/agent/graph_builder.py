@@ -1,15 +1,14 @@
 import textwrap
-from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.redis import RedisSaver
+from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.redis import AsyncRedisSaver
+# Removido o import do AsyncRedis pois usaremos a string de conexão direto no Saver
 from fast_api.core.config.configapi import settings
 from fast_api.core.agent.state import AgentState
 from fast_api.core.agent.nodes import (
-    router_node, menu_node, cart_node, checkout_node, confirm_node, summarizer_node
+    router_node, greeting_node, menu_node, cart_node, checkout_node, confirm_node, summarizer_node
 )
 
-
 def get_system_prompt(tenant, status_loja, chat_id, carrinho):
-    """Prompt base compartilhado (versão reduzida do antigo)"""
     status_pedido = carrinho.get("status", "MONTANDO_PEDIDO")
     texto_itens = ", ".join([f"{i['qty']}x {i['nome']}" for i in carrinho.get("itens", [])]) or "Vazio"
 
@@ -31,19 +30,23 @@ def get_system_prompt(tenant, status_loja, chat_id, carrinho):
         Responda curto, natural e em português brasileiro. Use emojis com moderação.
     """)
 
-
-def build_graph(tenant, status_loja, chat_id, carrinho_dados):
+async def build_graph(tenant, status_loja, chat_id, carrinho_dados):
     workflow = StateGraph(AgentState)
     
+    # 1. Registro dos Nós
     workflow.add_node("router", router_node)
+    workflow.add_node("greeting", greeting_node)
     workflow.add_node("menu", menu_node)
     workflow.add_node("cart", cart_node)
     workflow.add_node("checkout", checkout_node)
     workflow.add_node("confirm", confirm_node)
     workflow.add_node("summarizer", summarizer_node)
     
+    # 2. Lógica de Roteamento Condicional
     def route(state: AgentState):
         intent = state.get("last_intent", "")
+        if intent in ["saudacao", "duvida_geral", "fallback"]:
+            return "greeting"
         if intent == "ver_cardapio":
             return "menu"
         if intent == "adicionar_item":
@@ -52,10 +55,11 @@ def build_graph(tenant, status_loja, chat_id, carrinho_dados):
             return "checkout"
         if intent == "confirmar_pedido":
             return "confirm"
-        return "menu"
+        return "greeting"
     
     workflow.add_conditional_edges("router", route)
     
+    # 3. Fluxo de convergência para o Summarizer
     workflow.add_edge("menu", "summarizer")
     workflow.add_edge("cart", "summarizer")
     workflow.add_edge("checkout", "summarizer")
@@ -64,7 +68,12 @@ def build_graph(tenant, status_loja, chat_id, carrinho_dados):
     
     workflow.set_entry_point("router")
     
-    checkpointer = RedisSaver.from_conn_info(url=settings.REDIS_URL)
+    # CORREÇÃO CRÍTICA DO REDIS: Passando a URL diretamente para o método de fábrica
+    print("Conectando ao checkpointer Redis...")
+    checkpointer = AsyncRedisSaver(settings.REDIS_URL)
+    
+    await checkpointer.setup()
+    
     graph = workflow.compile(checkpointer=checkpointer)
     
     return {

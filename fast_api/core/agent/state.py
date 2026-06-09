@@ -1,4 +1,4 @@
-from typing import TypedDict, List, Optional, Annotated
+from typing import TypedDict, List, Optional, Annotated, Any
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 
@@ -15,10 +15,10 @@ class AgentState(TypedDict):
     tenant_id: str
     chat_id: str
     current_step: str          # MENU | BUILDING_CART | AWAITING_CHECKOUT | AGUARDANDO_CONFIRMACAO | FINALIZADO
-    
+    status: Any
     cart: List[CartItem]
     conversation_summary: str = ""
-    
+    termo_busca: str
     tipo_entrega: Optional[str] = None
     forma_pagamento: Optional[str] = None
     endereco: Optional[str] = None

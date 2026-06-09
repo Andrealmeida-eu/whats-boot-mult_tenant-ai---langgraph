@@ -84,7 +84,7 @@ async def handle_debounce(tenant_id: str, chat_id: str, token: int):
                     return
 
                 provider = get_provider(tenant)
-
+                log(provider)
 
                 log(f"[DEBOUNCE] Iniciando debounce para {tenant_id}:{chat_id} token={token}")
                 await asyncio.sleep(float(settings.DEBOUNCE_SECONDS))
@@ -102,7 +102,7 @@ async def handle_debounce(tenant_id: str, chat_id: str, token: int):
                     return
 
                 status_loja = verificar_status_e_turno(tenant_id, db)
-
+                log(f"statuys loja {status_loja}")
 
                 if not status_loja["aberto"]:
                     mensagem_fechado = f"Olá! O *{tenant.nome_fantasia}* está fechado no momento. 😴 Voltamos mais tarde!"
@@ -117,23 +117,25 @@ async def handle_debounce(tenant_id: str, chat_id: str, token: int):
                 log(f"carrinho resumo: {carrinho_dados}")
                 
                 cache_key = f"{tenant_id}:{chat_id}"
-                
+                log(f"cache_key: {cache_key}")
                 if cache_key not in graphs_cache:
-                    graphs_cache[cache_key] = build_graph(
+                    graphs_cache[cache_key] = await build_graph(
                         tenant,
                         status,
                         chat_id,
                         carrinho_dados
                     )
-                    
+                log(f"depois if: {cache_key}")
                 graphs_ctx = graphs_cache[cache_key]
                 graph = graphs_ctx["graph"]
+                log(f"depois if depois: {graph}")
                 
                 config = {
                     "configurable": {
                         "thread_id": f"{tenant_id}:{chat_id}"
                     }
                 }
+                log(f"config: {config}")
                 
                 input_state = {
                     "messages": [
@@ -145,23 +147,27 @@ async def handle_debounce(tenant_id: str, chat_id: str, token: int):
                     "tenant_id": tenant_id,
                     "chat_id": chat_id,
                     "current_step": "MENU",
+                    "status": status,
                     "cart": []
                     
                 }
+                log(f"iput state: {input_state}")
                 
                 result_graph = await graph.ainvoke(
                     input_state,
                     config=config
                 )
                 
+                log(f"result_graph: {result_graph}")
+                
                 
                 log(f"chamarei o invoke")
                 
                 ai_response = result_graph["messages"][-1]
 
-                log(f"voltei do invoke")
-
-                response = ai_response.replace('**', '*')
+                log(f"voltei do invoke: {ai_response}")
+                resposta = ai_response.content
+                response = resposta.replace('**', '*')
                 log(f"voltei das formatação")
 
                 result = await asyncio.to_thread(provider.send_text, chat_id, response)
