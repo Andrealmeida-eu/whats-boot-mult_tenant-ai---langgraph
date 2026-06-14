@@ -4,12 +4,13 @@ from __future__ import annotations
 from fastapi import FastAPI
 from sqlalchemy.util import ordered_column_set
 
-from fast_api.routes.webhook import webhooks
-from fast_api.routes.health import health
+from fast_api.api_restaurant import auth_api, caixa, cardapio, client, funcionamento, order
+from fast_api.webhook import webhooks
+from fast_api.health import health
 
-from fast_api.core.config.configapi import settings
-from fast_api.routes.api_restaurant import cardapio, order, caixa, tenant_controller, auth_api, client, funcionamento
-from fast_api.core.database.conection.conection_orm import Base, engine
+from core.config.configapi import settings
+from fast_api.api_restaurant import tenant_controller
+from core.data.database.conection.conection_orm import Base, engine
 
 
 

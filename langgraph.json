@@ -1,0 +1,10 @@
+{
+  "graphs": {
+    "lanchonete-agent": "./fast_api/core/agent/graph_builder.py:build_studio_graph"
+  },
+
+  "env": ".env",
+  "dependencies": {
+    "pip": "requirements.txt"
+  }
+}
