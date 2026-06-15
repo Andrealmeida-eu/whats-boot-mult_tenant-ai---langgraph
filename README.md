@@ -1,299 +1,217 @@
-# 🚀 Delivery AI Platform
 
-### Assistente Virtual Inteligente para Delivery via WhatsApp
+# 🚀 Whats Boot AI — Multi-Tenant WhatsApp Agent Platform
 
-> Plataforma SaaS multitenant para automação de atendimento, vendas e gestão de pedidos via WhatsApp utilizando IA Generativa, LangChain e FastAPI.
+## 🧠 Plataforma SaaS de IA Conversacional para Automação de Delivery
 
-
-
-
-
-
-
-
-![WhatsApp-Automation-green?style=for-the-badge)
+> Sistema backend escalável baseado em **LangGraph + FastAPI + Multi-Tenant Architecture**, projetado para automação de atendimento e pedidos via WhatsApp com agentes de IA orientados por estado.
 
 ---
 
-# 📌 Visão Geral
+## 📌 Elevator Pitch 
 
-O Delivery AI Platform é uma solução completa para restaurantes, marmitarias, hamburguerias, pizzarias e lanchonetes que desejam automatizar seu atendimento pelo WhatsApp sem perder controle operacional.
-
-A plataforma combina Inteligência Artificial, automação conversacional e gestão operacional para transformar mensagens em pedidos estruturados.
-
-O cliente conversa naturalmente pelo WhatsApp enquanto a IA:
-
-* Apresenta o cardápio
-* Monta pedidos
-* Gerencia carrinho
-* Sugere adicionais
-* Coleta endereço
-* Define pagamento
-* Calcula troco
-* Finaliza pedidos
-* Integra com o sistema de gestão
-
-Tudo isso sem intervenção humana.
+Plataforma backend de alta complexidade que implementa um **agente de IA conversacional stateful** utilizando **LangGraph**, capaz de operar múltiplos estabelecimentos (multi-tenant), automatizando fluxos de atendimento e pedidos via WhatsApp com controle transacional, persistência de estado e roteamento inteligente de intenções.
 
 ---
 
-# 🎯 Problema Resolvido
+# 🧩 Visão Geral do Sistema
 
-Empresas de delivery enfrentam diariamente:
+O sistema transforma mensagens do WhatsApp em **fluxos estruturados de decisão e execução**, utilizando uma arquitetura baseada em:
 
-* Alto volume de mensagens
-* Erros de digitação em pedidos
-* Demora no atendimento
-* Perda de vendas em horários de pico
-* Custos elevados com atendentes
-
-A plataforma elimina esses gargalos através de um agente autônomo especializado em vendas para delivery.
+* Agentes de IA com estado (Stateful AI Agents)
+* Graph-based orchestration (LangGraph)
+* APIs REST para gestão operacional
+* Arquitetura multi-tenant isolada
+* Persistência via PostgreSQL + Redis
 
 ---
 
-# 🏗 Arquitetura
+# 🧠 Arquitetura de Agentes (LangGraph)
 
-```text
-Cliente WhatsApp
-       │
-       ▼
-Webhook FastAPI
-       │
-       ▼
-Fila Redis + Debounce
-       │
-       ▼
-AgentExecutor (LangChain)
-       │
- ┌─────┼─────┐
- ▼     ▼     ▼
-Tools  Redis PostgreSQL
-       │
-       ▼
-Sistema de Gestão
-       │
-       ▼
-Resposta para WhatsApp
-```
+O núcleo do sistema é um **grafo de execução de decisões (StateGraph)**.
 
----
+## 🔁 Fluxo de execução
 
-# ⚡ Principais Diferenciais
+O agente inicia no `router node`, que interpreta a intenção do usuário:
 
-## 🧠 IA Orientada por Estado
+### Mapeamento de intenções:
 
-O comportamento do agente muda dinamicamente conforme a etapa da venda.
+* `ver_cardapio` → menu node
+* `adicionar_item / remover_item` → cart node
+* `checkout / informar_dados` → checkout node
+* `confirmar_pedido` → confirm node
+* `duvida_geral` → support node
+* fallback → greeting node
 
-Exemplos:
+## 🧠 Características técnicas
 
-* Navegação do cardápio
-* Montagem do pedido
-* Captura de endereço
-* Pagamento
-* Confirmação final
-
-Isso reduz drasticamente alucinações da IA.
+* Estado compartilhado (`AgentState`)
+* Execução determinística baseada em intenção
+* Encadeamento com nó final `summarizer`
+* Persistência de estado via Redis checkpoint
 
 ---
 
-## 🛒 Carrinho Persistente
+# 🏢 Multi-Tenant Architecture
 
-Utilizando Redis para armazenamento de contexto:
-
-* Adição de itens
-* Remoção
-* Alteração de quantidade
-* Recuperação de sessão
-
-Mesmo que o usuário interrompa a conversa.
-
----
-
-## ⚙️ Debounce Inteligente
-
-Quando o cliente envia várias mensagens seguidas:
-
-```text
-"Quero uma pizza"
-
-"Calabresa"
-
-"Grande"
-
-"Com borda"
-```
-
-O sistema agrupa as mensagens antes de chamar o LLM.
-
-Benefícios:
-
-* Menor consumo de tokens
-* Menor latência
-* Menor custo operacional
-
----
-
-## 🔧 Tool Calling Estruturado
-
-O agente não manipula dados livremente.
-
-Toda operação passa por ferramentas tipadas:
-
-```python
-AdicionarItemTool
-RemoverItemTool
-BuscarCardapioTool
-CheckoutTool
-CalcularTrocoTool
-```
-
-Garantindo integridade dos dados.
-
----
-
-# 🏢 Multi-Tenant
-
-A plataforma foi projetada para operar centenas de estabelecimentos simultaneamente.
+O sistema foi projetado para operar múltiplos estabelecimentos de forma isolada.
 
 Cada tenant possui:
 
+* Banco de dados lógico isolado
 * Cardápio próprio
-* Horários próprios
-* Configurações próprias
-* Prompts próprios
-* Instâncias WhatsApp próprias
+* Fluxos próprios de atendimento
+* Configuração independente de IA
+* Controle de usuários e pedidos
 
-Sem compartilhamento de dados.
-
----
-
-# 📱 Multi-Provedor WhatsApp
-
-Arquitetura preparada para múltiplos gateways:
-
-* Evolution API
-* Meta Cloud API
-* Z-API
-* UltraMsg
-* Provedores customizados
-
-Bastando implementar um adapter.
+➡️ Arquitetura preparada para modelo SaaS escalável.
 
 ---
 
-# 🖥 Painel Administrativo
+# 📦 Módulos Principais
 
-Frontend desenvolvido em React + TypeScript.
+## 🧾 Core Agent System
 
-Funcionalidades:
-
-### Gestão de Cardápio
-
-* Categorias
-* Produtos
-* Adicionais
-* Preços
-
-### Operação
-
-* Turnos
-* Horários
-* Status Aberto/Fechado
-
-### Caixa
-
-* Abertura de caixa
-* Fechamento de caixa
-* Controle operacional
-
-### Configuração da IA
-
-* Prompt personalizado
-* Mensagens automáticas
-* Estratégias de venda
+* `graph_builder.py` → definição do fluxo LangGraph
+* `nodes.py` → lógica de cada etapa do agente
+* `state.py` → estado central da execução
+* `service_tool.py` → ferramentas operacionais do agente
+* `model.py` → abstrações do modelo de IA
 
 ---
 
-# 🔐 Segurança
+## 🏪 Domínio de Negócio (Restaurant System)
 
-* JWT Authentication
-* Multi-Tenant Isolation
+* Auth (autenticação)
+* Orders (pedidos)
+* Product (cardápio/produtos)
+* Client (clientes)
+* Financial (caixa e financeiro)
+* Gestão de IA (configuração de comportamento do agente)
+
+---
+
+## 🌐 API Layer (FastAPI)
+
+Endpoints organizados por domínio:
+
+* `auth`
+* `client`
+* `order`
+* `cardapio`
+* `caixa`
+* `tenant_controller`
+* `webhook`
+* `health`
+
+---
+
+## 🗄️ Infraestrutura
+
+* PostgreSQL (persistência principal)
+* FastApi
+* Redis (cache + checkpoint de estado do agente)
 * SQLAlchemy ORM
-* Validação Pydantic
-* Controle de permissões
-* Variáveis protegidas via .env
+* Pydantic (validação de dados)
 
 ---
 
-# 🛠 Stack Tecnológica
+# 🔐 Segurança e Isolamento
 
-## Backend
+* Autenticação via JWT
+* Separação completa por tenant
+* Controle de acesso por domínio
+* Validação de payload com Pydantic
+* Camada ORM para segurança de queries
 
-* Python 3.11+
-* FastAPI
-* SQLAlchemy
-* Pydantic
-* PostgreSQL
+---
 
-## IA
+# 🧠 Diferenciais Técnicos
 
-* LangChain
-* AgentExecutor
-* OpenAI
+## 1. Agentic AI real (não chatbot simples)
 
-## Infraestrutura
+O sistema não usa apenas prompts:
 
-* Redis
-* Docker
-* Docker Compose
+* Usa **grafo de estados (LangGraph)**
+* Tem roteamento determinístico por intenção
+* Mantém memória de execução
+* Executa ferramentas estruturadas
 
-## Frontend
+---
 
-* React
-* TypeScript
+## 2. Arquitetura orientada a estado
+
+O comportamento do agente depende de:
+
+* intenção atual
+* histórico de conversa
+* estado do carrinho/pedido
+* contexto do tenant
+
+---
+
+## 3. Escalabilidade SaaS
+
+* Multi-tenant nativo
+* Backend stateless com Redis checkpoint
+* Separação de domínio por módulos
+
+---
+
+## 4. Engine de decisão híbrida
+
+Combina:
+
+* Regras determinísticas (router)
+* IA generativa (nodes)
+* ferramentas estruturadas (tools)
+
 
 ---
 
 # 📈 Casos de Uso
 
-✅ Restaurantes
-
-✅ Hamburguerias
-
-✅ Pizzarias
-
-✅ Marmitarias
-
-✅ Lanchonetes
-
-✅ Delivery de Açaí
-
-✅ Dark Kitchens
+* Automação de restaurantes
+* Atendimento via WhatsApp com IA
+* Sistemas SaaS de pedidos
+* Agentes de vendas inteligentes
+* Backend para plataformas de delivery
 
 ---
 
-# 🚀 Roadmap
+# 🧭 Roadmap Técnico
 
-* [ ] Dashboard Analítico
-* [ ] Integração iFood
-* [ ] Integração Anota AI
-* [ ] Integração ERP
-* [ ] Voice AI
-* [ ] Multi-LLM Support
-* [ ] RAG para FAQs
-* [ ] Monitoramento em Tempo Real
-* [ ] Painel SaaS para Revendas
+* [ ] Memória semântica (RAG)
+* [ ] Painel admin completo multi-tenant
+* [ ] Observabilidade (logs + tracing)
+* [ ] Versionamento de agentes
+* [ ] Suporte multi-LLM
+* [ ] Analytics de conversação
+* [ ] Otimização de custo por token
 
 ---
 
-# 📄 Licença
+# 👨‍💻 Posicionamento Profissional
 
-Este projeto está sob licença MIT.
+Este projeto demonstra competências em:
+
+* Backend de alta escala (FastAPI)
+* Engenharia de IA aplicada (LangGraph)
+* Arquitetura SaaS multi-tenant
+* Sistemas baseados em agentes (Agentic Systems)
+* Integração de IA com sistemas reais de negócio
 
 ---
 
-# 👨‍💻 Autor
+# 🏁 Resumo
 
-Desenvolvido com foco em arquitetura escalável, IA conversacional e automação de vendas para delivery.
+Este não é apenas um chatbot.
 
-Se este projeto foi útil para você, deixe uma ⭐ no repositório.
+É uma **plataforma de agentes de IA com arquitetura de produção**, focada em automação de operações reais de negócios via WhatsApp.
+
+---
+
+Se quiser, posso na próxima etapa:
+
+* transformar isso em **README ainda mais “GitHub viral” (com badges + diagramas visuais)**
+* ou montar uma versão **100% focada em vaga internacional (inglês + senior staff engineer pitch)**
+* ou ainda criar um **portfólio PDF de recrutamento baseado nesse projeto**
