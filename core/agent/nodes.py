@@ -2,11 +2,14 @@ from langchain_core.messages import AIMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
+from langgraph.graph.message import RemoveMessage
+
 from core.agent.model import IntentRouter
 from core.agent.state import AgentState
 from core.data.database.model.restaurant.product import Produto
 from core.data.database.conection.conection_orm import get_db
 from core.utils.agent_util import formatar_cardapio_whatsapp
+
 
 from core.agent.service_tool import (
     consultar_cardapio_state,
@@ -268,13 +271,22 @@ async def confirm_node(state: AgentState) -> dict:
     resposta_amigavel = await chain.ainvoke({"retorno_sistema": str(result)})
 
     if "Sucesso" in result:
+        
+        messages_del = [RemoveMessage(id=m.id) for m in state["messages"]]
+        new_message =  [AIMessage(content=resposta_amigavel.content)]
+        
+        messages_update = messages_del + [new_message]
         return {
             "current_step": "FINALIZADO",
             "cart": [],             
             "endereco": "",
             "tipo_entrega": "",        
-            "forma_pagamento": "",   
-            "messages": [AIMessage(content=resposta_amigavel.content)]
+            "forma_pagamento": "",
+            "troco_para": "", 
+            "temp_items": [],
+            "termo_busca": "",
+            "conversation_summary": "",   
+            "messages": messages_update
         }
     else:
         return {
