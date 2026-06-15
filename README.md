@@ -208,10 +208,4 @@ Este não é apenas um chatbot.
 
 É uma **plataforma de agentes de IA com arquitetura de produção**, focada em automação de operações reais de negócios via WhatsApp.
 
----
 
-Se quiser, posso na próxima etapa:
-
-* transformar isso em **README ainda mais “GitHub viral” (com badges + diagramas visuais)**
-* ou montar uma versão **100% focada em vaga internacional (inglês + senior staff engineer pitch)**
-* ou ainda criar um **portfólio PDF de recrutamento baseado nesse projeto**
