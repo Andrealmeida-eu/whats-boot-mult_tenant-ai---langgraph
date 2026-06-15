@@ -9,7 +9,7 @@ from core.agent.state import AgentState
 from core.data.database.model.restaurant.product import Produto
 from core.data.database.conection.conection_orm import get_db
 from core.utils.agent_util import formatar_cardapio_whatsapp
-
+from sqlalchemy import or_
 
 from core.agent.service_tool import (
     consultar_cardapio_state,
@@ -105,9 +105,12 @@ async def greeting_node(state: AgentState) -> dict:
 
 async def menu_node(state: AgentState) -> dict:
     termo = state.get("termo_busca", "")
+  
+    turno = state["status"]["turno"].value
+    
     cardapio_response = await consultar_cardapio_state(
         tenant_id = state["tenant_id"],
-        turno_especifico = str(state["status"]),
+        turno_especifico = str(turno) if turno else 'dia',
         termo_busca = termo,
     )
     cardapio_response_format = formatar_cardapio_whatsapp(cardapio_response)
@@ -125,7 +128,7 @@ async def menu_node(state: AgentState) -> dict:
 async def cart_node(state: AgentState) -> dict:
     """Gerencia carrinho 100% no State (Sem Redis)"""
     itens_extraidos = state.get("temp_items") or []
-
+    turno = state["status"]["turno"].value
     if not itens_extraidos:
         resposta = AIMessage(content="Poderia me confirmar o nome exato do item e a quantidade que deseja adicionar? 🤔")
         return {"messages": [resposta]}
@@ -160,34 +163,49 @@ async def cart_node(state: AgentState) -> dict:
                 else:
                     resultados_sistema.append(f"Erro: '{nome_req}' não estava no carrinho.")
             else:
-                produto_db = db.query(Produto).filter(
+                produtos_db = db.query(Produto).filter(
                     Produto.nome.ilike(f"%{nome_req}%"),
+                    or_(
+                        Produto.disponibilidade_turno == turno,
+                        Produto.disponibilidade_turno == 'todos'
+                    ),
                     Produto.tenant_id == tenant_id
-                ).first()
+                ).all()
 
-                if produto_db:
-                    item_existente = next((i for i in carrinho_atual if i["nome"] == produto_db.nome), None)
+                if not produtos_db:
+                    resultados_sistema.append(f"Erro: '''{nome_req}''' não encontrado no cardápio.")
+                
+                # SE ACHOU EXATAMENTE 1: Adiciona direto
+                elif len(produtos_db) == 1:
+                    produto_exato = produtos_db[0]
+                    item_existente = next((i for i in carrinho_atual if i["nome"] == produto_exato.nome), None)
                     if item_existente:
                         item_existente["qty"] += qtd_req 
                     else:
                         carrinho_atual.append({
-                            "nome": produto_db.nome,
+                            "nome": produto_exato.nome,
                             "qty": qtd_req,
-                            "preco": float(produto_db.preco)
+                            "preco": float(produto_exato.preco)
                         })
-                    resultados_sistema.append(f"Sucesso: {qtd_req}x '''{produto_db.nome}''' adicionado.")
+                    resultados_sistema.append(f"Sucesso: {qtd_req}x '''{produto_exato.nome}''' adicionado.")
+                
+                # SE ACHOU MAIS DE 1: Pede para refinar
                 else:
-                    resultados_sistema.append(f"Erro: '''{nome_req}''' não encontrado no cardápio.")
+                    nomes_opcoes = [p.nome for p in produtos_db]
+                    opcoes_str = ", ".join(nomes_opcoes)
+                    resultados_sistema.append(f"Refinar: Encontrei mais de uma opção para '{nome_req}': {opcoes_str}. Qual delas o cliente quer?")
     finally:
         db.close()
+
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", """Você é o garçom virtual da lanchonete.
             Ocorreu o seguinte evento no sistema: '{retorno_sistema}'.
             REGRAS:
-            1. Fale DIRETAMENTE com o cliente.
+            1. Fale DIRETAMENTE com o cliente de forma amigável.
             2. Se for ERRO, avise educadamente.
-            3. Se for SUCESSO, confirme o que foi alterado."""),
+            3. Se for SUCESSO, confirme o que foi alterado.
+            4. Se for REFINAR, pergunte qual das opções listadas ele prefere, sem adicionar nada ao pedido ainda."""),
         ("human", "Responda ao cliente agora.")
     ])
 
@@ -200,7 +218,7 @@ async def cart_node(state: AgentState) -> dict:
     return {
         "cart": carrinho_atual,
         "messages": [AIMessage(content=resposta_amigavel.content)],
-        "temp_items": [] # Esvazia temporários
+        "temp_items": [] 
     }
 
 async def checkout_node(state: AgentState) -> dict:
@@ -246,6 +264,9 @@ async def checkout_node(state: AgentState) -> dict:
 
 
 async def confirm_node(state: AgentState) -> dict:
+    
+    troco_cru = state.get("troco_para")
+    troco_seguro = float(troco_cru) if troco_cru else 0.0
     """Confirmação final enviando variáveis do State para a função"""
     result = await lancar_pedido_sistema_state(
         tenant_id=state["tenant_id"],
@@ -254,7 +275,7 @@ async def confirm_node(state: AgentState) -> dict:
         tipo_entrega=state.get("tipo_entrega", ""),
         forma_pagamento=state.get("forma_pagamento", ""),
         endereco_entrega=state.get("endereco", ""),
-        troco_para=state.get("troco_para", "0.0"),
+        troco_para=troco_seguro,
         itens_carrinho=state.get("cart", [])
     )
     
@@ -273,7 +294,7 @@ async def confirm_node(state: AgentState) -> dict:
     if "Sucesso" in result:
         
         messages_del = [RemoveMessage(id=m.id) for m in state["messages"]]
-        new_message =  [AIMessage(content=resposta_amigavel.content)]
+        new_message =  AIMessage(content=resposta_amigavel.content)
         
         messages_update = messages_del + [new_message]
         return {

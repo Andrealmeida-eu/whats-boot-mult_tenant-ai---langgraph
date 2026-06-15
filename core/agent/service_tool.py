@@ -96,7 +96,7 @@ async def consultar_cardapio_state(
                 turno_pesquisa = status_atual["turno"] if status_atual["aberto"] else None
             else:
                 turno_pesquisa = turno_especifico
-
+            log(f"no Consultar cardapio _/-/_/-/_/->{turno_pesquisa}")
             produtos = db.query(Produto).filter(
                 Produto.tenant_id == tenant_id,
                 or_(
